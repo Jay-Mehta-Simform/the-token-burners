@@ -14,15 +14,15 @@ A developer links their GitHub account to the Intent Drift portal. They see all 
 
 ## 2. Tech stack
 
-| Layer | Choice |
-|---|---|
-| Frontend | React (single-page application) |
-| Backend | Node.js |
-| Database | PostgreSQL (persist everything) |
-| LLM provider | Anthropic Claude (`claude-sonnet-4-6`) |
-| Auth | GitHub OAuth (only login method) |
-| GitHub integration | GitHub REST API |
-| Pipeline execution | Async on backend; frontend polls for status |
+| Layer              | Choice                                                                                              |
+| ------------------ | --------------------------------------------------------------------------------------------------- |
+| Frontend           | React (single-page application)                                                                     |
+| Backend            | Node.js                                                                                             |
+| Database           | PostgreSQL (persist everything)                                                                     |
+| LLM provider       | Claude Code headless (subscription, `claude-sonnet-4-6`) — driven via `claude -p` stdin, no API key |
+| Auth               | GitHub OAuth (only login method)                                                                    |
+| GitHub integration | `gh` CLI (`gh pr diff`) — authenticated via `gh auth login` or `GH_TOKEN`                           |
+| Pipeline execution | Async on backend; frontend polls for status                                                         |
 
 ---
 
@@ -33,7 +33,7 @@ A developer links their GitHub account to the Intent Drift portal. They see all 
 - **Project** — a GitHub repository, one-to-one. Synced from GitHub.
 - **Analysis** — one run of the AI pipeline on a PR. States: `analyzing → ready → completed | failed`.
 - **Spec (Original Specification)** — human-authored intended behaviour, provided by the user at trigger time (paste or upload).
-- **Code Input** — full file contents of all files changed in the PR (not a diff).
+- **Code Input** — the unified diff of all files changed in the PR, fetched by the backend via `gh pr diff`. The user provides only the PR link; the backend resolves the diff automatically.
 - **Reverse Spec** — AI-generated plain-language description of what the code actually does, inferred from implementation alone.
 - **Gap** — a divergence between Spec and Reverse Spec. Classified by `type` (missing feature | deviation | undocumented addition) and `severity`.
 - **Question** — AI-generated, answerable prompt attached to a Gap.
@@ -48,14 +48,16 @@ A developer links their GitHub account to the Intent Drift portal. They see all 
 2. **Project list** — all repositories the user has GitHub access to appear automatically as Projects.
 3. **PR list** — inside a Project, the user sees open pull requests for that repo.
 4. **Trigger Analysis** — on a PR, the user clicks "Analyze", pastes or uploads the original Spec, and confirms.
-   - Backend locks the PR (first-write-wins). If an Analysis is already `analyzing`, the trigger is rejected with "Analysis already in progress".
-   - The triggering user becomes the **Respondent**.
-5. **Analyzing** — backend fetches changed-file contents via GitHub REST API and runs the 3-step pipeline. Frontend polls for status.
+    - The user provides the PR link (e.g. `https://github.com/owner/repo/pull/123`). The backend parses the link and fetches the PR diff via `gh pr diff` — no manual file pasting required.
+    - Backend locks the PR (first-write-wins). If an Analysis is already `analyzing`, the trigger is rejected with "Analysis already in progress".
+    - The triggering user becomes the **Respondent**.
+5. **Analyzing** — backend fetches the PR diff via `gh pr diff` and runs the 3-step pipeline. Frontend polls for status.
 6. **Ready** — gaps and questions are displayed. Respondent answers each question inline.
 7. **Submit** — submit button is enabled only when every question has an answer. On submit, Analysis → `completed`.
 8. **Decision Record** — on-screen summary view + Markdown download. Visible to all repo members (read-only for non-Respondents).
 
 ### Edge cases
+
 - **Re-trigger:** Only one active Analysis per PR. Manually re-triggering replaces the previous one and resets all answers.
 - **Stale:** If new commits are pushed after an Analysis is `ready` or `completed`, show a stale warning banner. Do not auto re-trigger.
 - **Failure:** If any LLM call fails, Analysis → `failed`. Show an error state with a retry option (never an infinite spinner).
@@ -65,38 +67,41 @@ A developer links their GitHub account to the Intent Drift portal. They see all 
 
 ## 5. AI pipeline
 
-Three sequential Anthropic Claude calls, server-side. Each uses structured output (tool use) for parseable results.
+Three sequential Claude Code headless calls, server-side. The backend fetches all GitHub content itself and passes it as plain text to Claude via stdin (`tools: []`). No Anthropic API key required — uses the Claude subscription login. Structured output is achieved via JSON-only prompts + backend parse/validate.
 
 ### Step 1 — Reverse Spec Generation
-- **Input:** full file contents of changed files.
+
+- **Input:** the PR diff (fetched by backend via `gh pr diff`; passed as text — Claude does not call any tools).
 - **Instruction:** describe what the code actually does in plain language, inferring behaviour purely from implementation. The model must NOT be given the original Spec at this step.
 - **Output:** plain-language reverse specification, formatted as **Markdown** (see "Markdown vs JSON outputs" below). Stored verbatim in `analyses.reverse_spec`.
 
 ### Step 2 — Gap Analysis
+
 - **Input:** the Reverse Spec (from step 1) + the original Spec (from the user).
 - **Instruction:** compare them and return a list of gaps.
 - **Output (structured):** array of gaps, each:
-  ```json
-  {
-    "id": "string",
-    "title": "string",
-    "description": "string",
-    "type": "missing_feature | deviation | undocumented_addition",
-    "severity": "low | medium | high"
-  }
-  ```
+    ```json
+    {
+      "id": "string",
+      "title": "string",
+      "description": "string",
+      "type": "missing_feature | deviation | undocumented_addition",
+      "severity": "low | medium | high"
+    }
+    ```
 
 ### Step 3 — Question Generation
+
 - **Input:** the list of gaps from step 2.
 - **Instruction:** for each gap, generate one or more specific, answerable questions (not vague flags).
 - **Output (structured):** array of questions, each:
-  ```json
-  {
-    "id": "string",
-    "gap_id": "string",
-    "text": "string"
-  }
-  ```
+    ```json
+    {
+      "id": "string",
+      "gap_id": "string",
+      "text": "string"
+    }
+    ```
 
 ---
 
@@ -162,17 +167,17 @@ questions
 
 ## 7. API surface (backend)
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/auth/github` | Begin GitHub OAuth |
-| GET | `/auth/github/callback` | OAuth callback; create/lookup user, store token |
-| GET | `/api/projects` | List repos the user has access to |
-| GET | `/api/projects/:id/pulls` | List open PRs for a repo |
-| POST | `/api/analyses` | Trigger Analysis. Body: `{ project_id, pr_number, original_spec }`. Locks PR (first-write-wins). Returns `{ analysis_id }`. |
-| GET | `/api/analyses/:id` | Poll Analysis status + gaps + questions + answers |
-| PATCH | `/api/analyses/:id/answers` | Save answer(s). Body: `{ question_id, answer }` |
-| POST | `/api/analyses/:id/submit` | Submit. Rejected unless all questions answered. Sets `completed`. |
-| GET | `/api/analyses/:id/export` | Download Decision Record as Markdown |
+| Method | Endpoint                    | Purpose                                                                                                                                                                                     |
+| ------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/auth/github`              | Begin GitHub OAuth                                                                                                                                                                          |
+| GET    | `/auth/github/callback`     | OAuth callback; create/lookup user, store token                                                                                                                                             |
+| GET    | `/api/projects`             | List repos the user has access to                                                                                                                                                           |
+| GET    | `/api/projects/:id/pulls`   | List open PRs for a repo                                                                                                                                                                    |
+| POST   | `/api/analyses`             | Trigger Analysis. Body: `{ pr_url, original_spec }` — backend parses `pr_url` to extract owner/repo/PR number and fetches the diff. Locks PR (first-write-wins). Returns `{ analysis_id }`. |
+| GET    | `/api/analyses/:id`         | Poll Analysis status + gaps + questions + answers                                                                                                                                           |
+| PATCH  | `/api/analyses/:id/answers` | Save answer(s). Body: `{ question_id, answer }`                                                                                                                                             |
+| POST   | `/api/analyses/:id/submit`  | Submit. Rejected unless all questions answered. Sets `completed`.                                                                                                                           |
+| GET    | `/api/analyses/:id/export`  | Download Decision Record as Markdown                                                                                                                                                        |
 
 ---
 
@@ -181,8 +186,8 @@ questions
 - GitHub OAuth login
 - Project (repo) list
 - PR list per project
-- Trigger Analysis with manual Spec input (paste/upload)
-- Fetch changed-file contents via GitHub REST API
+- Trigger Analysis with PR link + manual Spec input (paste/upload)
+- Fetch PR diff via `gh pr diff` (backend-side; user provides only the PR URL)
 - 3-step AI pipeline (reverse spec → gap analysis → questions)
 - Async execution with frontend polling, including `failed` state handling
 - Gap report view (gaps grouped, classified by type + severity)
@@ -208,7 +213,8 @@ questions
 ## 10. Build notes
 
 - Encrypt OAuth tokens at rest.
-- All three LLM calls run server-side; never expose the Anthropic key to the frontend.
-- Use Claude tool use / structured output for steps 2 and 3 so responses parse reliably.
+- All three LLM calls run server-side via **Claude Code headless** (`claude -p` subscription) — no Anthropic API key; never expose any credentials to the frontend.
+- The backend fetches the PR diff itself (`gh pr diff`) and passes it as text to Claude via stdin. Claude runs with `tools: []` — it never accesses GitHub directly.
+- Use JSON-only prompts + backend parse/validate for structured output (steps 1, 2, 3). No Claude tool use needed.
 - Stale detection: compare current PR head SHA (from GitHub) against `analyses.pr_head_sha`.
 - Keep `CONTEXT.md` as the source of truth for domain terminology.
