@@ -182,7 +182,38 @@ function ReverseSpecPanel({ reverseSpec, label = 'REVERSE SPEC · WHAT THE CODE 
   )
 }
 
+function OriginalSpecPanel({ spec }) {
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--hairline)', borderTop: '3px solid var(--coral)', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '13px 18px', borderBottom: '1px solid var(--hairline)' }}>
+        <span style={{ color: 'var(--coral)', display: 'inline-flex' }}><Icon name="compare" size={15} /></span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--t-muted)' }}>ORIGINAL SPEC · WHAT WAS INTENDED</span>
+      </div>
+      <div style={{ padding: '18px 20px' }}><Markdown className="md-original-spec">{spec}</Markdown></div>
+    </div>
+  )
+}
+
+function SpecComparison({ reverseSpec, spec }) {
+  if (!spec) return <ReverseSpecPanel reverseSpec={reverseSpec} />
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, alignItems: 'start' }}>
+      <OriginalSpecPanel spec={spec} />
+      <ReverseSpecPanel reverseSpec={reverseSpec} />
+    </div>
+  )
+}
+
 function ReadyPanel({ reverseSpec, specDraft, onSpecDraft, onCompare }) {
+  const handleUpload = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => onSpecDraft(ev.target.result)
+    reader.readAsText(file)
+    e.target.value = ''
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <ReverseSpecPanel reverseSpec={reverseSpec} />
@@ -193,6 +224,11 @@ function ReadyPanel({ reverseSpec, specDraft, onSpecDraft, onCompare }) {
           style={{ width: '100%', minHeight: 140, resize: 'vertical', padding: '13px 15px', border: '1px solid var(--hairline)', borderRadius: 6, background: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: 12.5, lineHeight: 1.6, color: 'var(--t-body)', outline: 'none' }}
           onFocus={(e) => (e.target.style.borderColor = 'var(--coral)')} onBlur={(e) => (e.target.style.borderColor = 'var(--hairline)')} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 18px', background: 'var(--paper)', border: '1px solid var(--hairline)', borderRadius: 6, fontSize: 14, fontWeight: 700, color: 'var(--t-body)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--coral)')} onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--hairline)')}>
+            <Icon name="upload" size={15} /> Upload Specs
+            <input type="file" accept=".md,.txt,.pdf" style={{ display: 'none' }} onChange={handleUpload} />
+          </label>
           {/* BACKEND: provideSpec(analysisId, specDraft) -> gap analysis + question gen. */}
           <button onClick={onCompare} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '11px 18px', background: 'var(--coral)', border: 'none', borderRadius: 6, fontSize: 14, fontWeight: 700, color: '#fff', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--coral-deep)')} onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--coral)')}>
@@ -248,7 +284,7 @@ function QuestionsResolved({ a, gaps, editable, readOnly, answeredCount, allAnsw
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <ReverseSpecPanel reverseSpec={a.reverseSpec} />
+      <SpecComparison reverseSpec={a.reverseSpec} spec={a.spec} />
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>

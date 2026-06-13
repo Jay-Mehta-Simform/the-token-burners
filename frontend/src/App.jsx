@@ -22,7 +22,6 @@ function useAppState() {
     auth: false,
     page: 'projects',
     view: null,
-    search: '',
     analyses: seedAnalyses(),
     specDraft: '',
   })
@@ -36,7 +35,7 @@ function useAppState() {
     logout: () => patch({ auth: false, view: null, page: 'projects' }),
 
     go: (page) => patch({ page, view: null }),
-    openProject: (id, tab) => { patch({ view: { type: 'project', id, tab: tab || 'overview' } }); window.scrollTo(0, 0) },
+    openProject: (id, tab) => { patch({ view: { type: 'project', id, tab: tab || 'prs' } }); window.scrollTo(0, 0) },
     setTab: (tab) => patch((s) => ({ view: { ...s.view, tab } })),
     openAnalysis: (key) => { patch({ view: { type: 'analysis', key }, specDraft: '' }); window.scrollTo(0, 0) },
     openReport: (key) => { patch({ view: { type: 'report', key } }); window.scrollTo(0, 0) },
@@ -49,7 +48,6 @@ function useAppState() {
       return { ...s, view: null }
     }),
 
-    setSearch: (search) => patch({ search }),
     setSpecDraft: (specDraft) => patch({ specDraft }),
     resync: () => patch((s) => ({ ...s })), // BACKEND: resyncProjects()
 
@@ -67,7 +65,7 @@ function useAppState() {
 
     // BACKEND: provideSpec() then poll getAnalysis() until status === "questions_ready".
     provideSpec: (key) => {
-      patch((s) => ({ analyses: { ...s.analyses, [key]: { ...s.analyses[key], status: 'comparing' } } }))
+      patch((s) => ({ analyses: { ...s.analyses, [key]: { ...s.analyses[key], status: 'comparing', spec: s.specDraft } } }))
       clearTimeout(timers.current.t2)
       timers.current.t2 = setTimeout(() => {
         setState((s) => ({ ...s, analyses: { ...s.analyses, [key]: { ...s.analyses[key], ...synthGaps(), status: 'questions_ready' } } }))

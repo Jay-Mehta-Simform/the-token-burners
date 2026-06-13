@@ -50,19 +50,6 @@ export default function Header({ state, actions }) {
         <span style={{ fontSize: 12.5, color: 'var(--t-muted)', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pageSub}</span>
       </div>
       <div style={{ flex: 1 }} />
-      <div style={{ position: 'relative', width: 280, maxWidth: '30vw' }}>
-        <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--t-faint)', display: 'inline-flex', pointerEvents: 'none' }}><Icon name="search" size={16} /></span>
-        <input value={state.search} onChange={(e) => actions.setSearch(e.target.value)} placeholder="Search repositories…"
-          style={{ width: '100%', height: 38, padding: '0 12px 0 35px', border: '1px solid var(--hairline)', borderRadius: 6, background: 'var(--surface)', fontSize: 13.5, fontFamily: 'var(--font-sans)', color: 'var(--t-strong)', outline: 'none' }}
-          onFocus={(e) => { e.target.style.borderColor = 'var(--coral)'; e.target.style.background = 'var(--paper)' }}
-          onBlur={(e) => { e.target.style.borderColor = 'var(--hairline)'; e.target.style.background = 'var(--surface)' }} />
-      </div>
-      <button style={{ position: 'relative', width: 38, height: 38, border: '1px solid var(--hairline)', borderRadius: 6, background: 'var(--paper)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--t-muted)', cursor: 'pointer', flex: '0 0 auto' }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface)')}
-        onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--paper)')}>
-        <Icon name="bell" size={18} />
-        <span style={{ position: 'absolute', top: 8, right: 9, width: 6, height: 6, borderRadius: '50%', background: 'var(--coral)' }} />
-      </button>
     </header>
   )
 }

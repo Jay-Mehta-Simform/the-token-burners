@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import Icon from '../lib/Icon.jsx'
 import Hov from '../lib/Hov.jsx'
 import { StatePill } from '../lib/meta.jsx'
@@ -16,7 +16,8 @@ function NoSpec() {
 }
 
 export default function Projects({ state, actions }) {
-  const { search, analyses } = state
+  const [search, setSearch] = useState('')
+  const { analyses } = state
   const q = search.trim().toLowerCase()
   // BACKEND: replace repos() with data from listProjects(); filter is client-side search.
   const rows = repos().filter((r) => !q || (r.owner + '/' + r.name).toLowerCase().includes(q) || r.desc.toLowerCase().includes(q))
@@ -30,10 +31,19 @@ export default function Projects({ state, actions }) {
           </span>
           <span style={{ fontSize: 13, color: 'var(--t-muted)' }}>{rows.length} repositories</span>
         </div>
-        {/* BACKEND: resyncProjects() */}
-        <Hov as="button" onClick={actions.resync} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 13px', border: '1px solid var(--hairline)', background: 'var(--paper)', borderRadius: 6, fontSize: 13, fontWeight: 600, color: 'var(--t-strong)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }} hoverStyle={{ background: 'var(--surface)' }}>
-          <Icon name="refresh" size={15} /> Re-sync repositories
-        </Hov>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--t-faint)', display: 'inline-flex', pointerEvents: 'none' }}><Icon name="search" size={16} /></span>
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search repositories…"
+              style={{ width: 240, height: 36, padding: '0 12px 0 35px', border: '1px solid var(--hairline)', borderRadius: 6, background: 'var(--surface)', fontSize: 13.5, fontFamily: 'var(--font-sans)', color: 'var(--t-strong)', outline: 'none' }}
+              onFocus={(e) => { e.target.style.borderColor = 'var(--coral)'; e.target.style.background = 'var(--paper)' }}
+              onBlur={(e) => { e.target.style.borderColor = 'var(--hairline)'; e.target.style.background = 'var(--surface)' }} />
+          </div>
+          {/* BACKEND: resyncProjects() */}
+          <Hov as="button" onClick={actions.resync} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '8px 13px', border: '1px solid var(--hairline)', background: 'var(--paper)', borderRadius: 6, fontSize: 13, fontWeight: 600, color: 'var(--t-strong)', cursor: 'pointer', fontFamily: 'var(--font-sans)' }} hoverStyle={{ background: 'var(--surface)' }}>
+            <Icon name="refresh" size={15} /> Re-sync repositories
+          </Hov>
+        </div>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

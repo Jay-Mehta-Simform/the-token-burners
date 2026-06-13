@@ -51,6 +51,7 @@ export function seedAnalyses() {
   const A = {}
   A['payments-api#142'] = {
     status: 'completed', isStale: false, respondent: 'maya-chen', when: 'Today, 09:14', specVersion: 'v2.1',
+    spec: 'The notification scheduler **must dispatch queued notifications every hour**. Retries use exponential backoff capped at **5 minutes**. Batch size is 100 notifications per run. Per-user rate limiting is not required. No additional endpoints are introduced by this change.',
     reverseSpec: 'The changed files implement a **notification scheduler**. A cron job runs every 4 hours and dispatches queued notifications in batches of 100. Retries use exponential backoff capped at 15 minutes. A new `/metrics` endpoint exposes queue depth and dispatch latency. No per-user rate limiting is present.',
     gaps: [
       { id: 'g1', type: 'missing_feature', severity: 'high', title: 'Hourly notification cadence not implemented', description: 'The spec requires notifications to be dispatched every hour. The scheduler runs on a 4-hour cron interval, delaying time-sensitive alerts.', question: 'Was the 4-hour interval an intentional change, or should the scheduler be corrected to dispatch hourly as the spec requires?', answer: 'Not intentional — this was a leftover from local testing. Corrected to hourly in a follow-up commit and verified against the spec.' },
@@ -73,6 +74,7 @@ export function seedAnalyses() {
   }
   A['web-app#312'] = {
     status: 'completed', isStale: true, respondent: 'devon-r', when: 'Yesterday, 18:40', specVersion: 'v1.4',
+    spec: 'A **multi-step checkout flow** with three steps: cart review, shipping, and payment. A confirmation interstitial must be shown before calling `/api/charge` to satisfy chargeback compliance requirements. Guest checkout is gated behind a feature flag and disabled by default. State is held in React context and persisted to `sessionStorage`.',
     reverseSpec: 'A new **multi-step checkout flow** with three steps: cart review, shipping, and payment. State is held in a React context and persisted to `sessionStorage`. Guest checkout is supported. The payment step posts directly to `/api/charge` without a confirmation interstitial.',
     gaps: [
       { id: 'g1', type: 'missing_feature', severity: 'high', title: 'Order confirmation step missing', description: 'The spec defines a final confirmation screen before charging. The implementation charges immediately on the payment step.', question: 'Should a confirmation interstitial be added before the charge call, per the spec?', answer: 'Yes — a confirmation step was required for chargeback compliance. Added before merge.' },
@@ -90,6 +92,7 @@ export function seedAnalyses() {
   }
   A['billing#73'] = {
     status: 'completed', isStale: false, respondent: 'devon-r', when: '2 days ago', specVersion: 'v2.2',
+    spec: 'Mid-cycle plan changes must be **prorated to the second** based on the unused portion of the current billing period. Downgrades must take effect at the **end of the current billing period** to prevent revenue leakage. Upgrades apply immediately. Proration credits are applied to the next invoice.',
     reverseSpec: 'Mid-cycle plan changes are **prorated** by computing the unused portion of the current period and crediting it against the new plan. Proration is computed in whole days, not seconds. Downgrades take effect immediately rather than at period end.',
     gaps: [
       { id: 'g1', type: 'deviation', severity: 'medium', title: 'Proration computed in days, not seconds', description: 'The spec specifies second-level proration accuracy. The implementation rounds to whole days.', question: 'Is day-level proration acceptable, or must it be second-accurate as specified?', answer: 'Day-level is acceptable for the current pricing tiers. Spec amended to reflect day granularity.' },
