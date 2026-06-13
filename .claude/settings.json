@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev)",
+      "Bash(npm run build)",
+      "Bash(npm run start)",
+      "Bash(npm install *)",
+      "Bash(npx prisma generate)",
+      "Bash(npx prisma migrate dev*)",
+      "Bash(npx prisma migrate reset*)",
+      "Bash(npx prisma db push*)",
+      "Bash(npx prisma db pull)",
+      "Bash(npx prisma studio)",
+      "Bash(npx prisma format)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx tsc*)"
+    ],
+    "deny": [
+      "Read(.env)"
+    ]
+  }
+}
