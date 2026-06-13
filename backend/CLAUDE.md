@@ -31,7 +31,17 @@ After any change to `prisma/schema.prisma`, always run `npm run prisma:generate`
 - `prisma.ts` — exports a single `PrismaClient` instance. The generated client lives at `generated/prisma/` (not `@prisma/client`) because Prisma v7 uses a custom output path. Always import Prisma types from `../../generated/prisma/`.
 - `langchain.ts` — exports a pre-configured `ChatOpenAI` instance (`gpt-4o-mini`). LangChain chains/agents should be built in `src/services/` and consume this singleton.
 
-**Error handling:** throw an object satisfying `AppError` (from `src/middleware/errorHandler.ts`) with an optional `statusCode` field; the global handler in `src/index.ts` converts it to a JSON response.
+**Error handling:** throw an object satisfying `AppError` (from `src/middleware/errorHandler.ts`) with an optional `statusCode` field; the global handler in `src/index.ts` converts it to a JSON response. Use the `httpError(statusCode, message)` helper in `src/lib/httpError.ts`.
+
+## Intent Drift AI pipeline
+
+The Intent Drift feature uses **Claude Code headless (subscription)** as its AI engine — driven via `src/lib/claudeRunner.ts` (a port of `claude-headless-demo/`), **not** the LangChain/OpenAI singleton in `src/lib/langchain.ts` (currently unused). No Anthropic API key is needed; it reuses the local `claude` subscription login.
+
+- **Prompts** live in `src/prompts/` — one file per pipeline step. Step 1 (`reverseSpec.ts`) is wired; `gapAnalysis.ts` and `questionGeneration.ts` are placeholders for steps 2–3.
+- **Config** in `src/config/claude.ts` (model, budget cap, permission mode — env-overridable).
+- **Step 1 flow:** `POST /api/reverse-spec { prNumber, repo? }` → `githubService.fetchPrDiff` (runs `gh pr diff`) → `reverseSpecService.generateReverseSpec` (hands the diff to Claude as text, parses JSON) → typed result + run metadata. Stateless (no DB).
+- **Prereqs:** `gh` installed + authenticated (`gh auth login`/`GH_TOKEN`); a Claude subscription login present.
+- **Fast test (no HTTP):** `npm run test:reverse-spec -- <prNumber> [owner/repo]`.
 
 ## Environment Variables
 

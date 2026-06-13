@@ -12,11 +12,11 @@
 import { GapType } from "./gapAnalysis.js";
 
 export interface GapForQuestionGen {
-  id: string;
-  title: string;
-  description: string;
-  type: GapType;
-  severity: string;
+	id: string;
+	title: string;
+	description: string;
+	type: GapType;
+	severity: string;
 }
 
 export const QUESTION_GENERATION_SYSTEM_PROMPT = `You are a product-governance facilitator. For each behavioural gap you are given, you write the specific questions the responsible person must answer to RESOLVE that gap and turn it into a clear decision.
@@ -51,31 +51,31 @@ Every provided gap must be covered by at least one question.`;
 
 /** JSON Schema for the structured/tool output of the question-generation step. */
 export const QUESTION_GENERATION_OUTPUT_SCHEMA = {
-  type: "object",
-  properties: {
-    questions: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          id: { type: "string", description: "Short stable id, e.g. 'q-1'." },
-          gap_id: {
-            type: "string",
-            description: "Id of the gap this question resolves; must match a provided gap id.",
-          },
-          text: {
-            type: "string",
-            description:
-              "Specific, behavioural, decision-oriented, self-contained question. No code references.",
-          },
-        },
-        required: ["id", "gap_id", "text"],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: ["questions"],
-  additionalProperties: false,
+	type: "object",
+	properties: {
+		questions: {
+			type: "array",
+			items: {
+				type: "object",
+				properties: {
+					id: { type: "string", description: "Short stable id, e.g. 'q-1'." },
+					gap_id: {
+						type: "string",
+						description: "Id of the gap this question resolves; must match a provided gap id.",
+					},
+					text: {
+						type: "string",
+						description:
+							"Specific, behavioural, decision-oriented, self-contained question. No code references.",
+					},
+				},
+				required: ["id", "gap_id", "text"],
+				additionalProperties: false,
+			},
+		},
+	},
+	required: ["questions"],
+	additionalProperties: false,
 } as const;
 
 /**
@@ -84,7 +84,7 @@ export const QUESTION_GENERATION_OUTPUT_SCHEMA = {
  * @param gaps The gaps produced by Step 2.
  */
 export function buildQuestionGenerationUserPrompt(gaps: GapForQuestionGen[]): string {
-  return `Generate resolving questions for each of the gaps below, following the rules. Cover every gap, keep questions specific and behavioural, and reference each gap by its id.
+	return `Generate resolving questions for each of the gaps below, following the rules. Cover every gap, keep questions specific and behavioural, and reference each gap by its id.
 
 <gaps>
 ${JSON.stringify(gaps, null, 2)}

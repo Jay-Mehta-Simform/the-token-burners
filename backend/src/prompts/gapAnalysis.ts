@@ -12,10 +12,10 @@
 
 /** The behavioural gap taxonomy. Keep this in sync with the gaps.type enum. */
 export const GAP_TYPES = [
-  "missing_implementation",
-  "behavioral_deviation",
-  "product_design_gap",
-  "missing_edge_case",
+	"missing_implementation",
+	"behavioral_deviation",
+	"product_design_gap",
+	"missing_edge_case",
 ] as const;
 
 export type GapType = (typeof GAP_TYPES)[number];
@@ -67,30 +67,30 @@ Return an object with a "gaps" array. Each gap has:
 
 /** JSON Schema for the structured/tool output of the gap-analysis step. */
 export const GAP_ANALYSIS_OUTPUT_SCHEMA = {
-  type: "object",
-  properties: {
-    gaps: {
-      type: "array",
-      items: {
-        type: "object",
-        properties: {
-          id: { type: "string", description: "Short stable id, e.g. 'gap-1'." },
-          title: { type: "string", description: "One-line behavioural summary." },
-          description: {
-            type: "string",
-            description:
-              "2-4 sentences: intended behaviour, actual/observed behaviour, behavioural consequence. No code references.",
-          },
-          type: { type: "string", enum: [...GAP_TYPES] },
-          severity: { type: "string", enum: [...GAP_SEVERITIES] },
-        },
-        required: ["id", "title", "description", "type", "severity"],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: ["gaps"],
-  additionalProperties: false,
+	type: "object",
+	properties: {
+		gaps: {
+			type: "array",
+			items: {
+				type: "object",
+				properties: {
+					id: { type: "string", description: "Short stable id, e.g. 'gap-1'." },
+					title: { type: "string", description: "One-line behavioural summary." },
+					description: {
+						type: "string",
+						description:
+							"2-4 sentences: intended behaviour, actual/observed behaviour, behavioural consequence. No code references.",
+					},
+					type: { type: "string", enum: [...GAP_TYPES] },
+					severity: { type: "string", enum: [...GAP_SEVERITIES] },
+				},
+				required: ["id", "title", "description", "type", "severity"],
+				additionalProperties: false,
+			},
+		},
+	},
+	required: ["gaps"],
+	additionalProperties: false,
 } as const;
 
 /**
@@ -99,11 +99,8 @@ export const GAP_ANALYSIS_OUTPUT_SCHEMA = {
  * @param originalSpec  Human-authored intended behaviour (as provided at trigger time).
  * @param reverseSpec   Output of Step 1 — behavioural description of the implementation.
  */
-export function buildGapAnalysisUserPrompt(
-  originalSpec: string,
-  reverseSpec: string
-): string {
-  return `Compare the two documents below and produce the list of behavioural gaps as instructed. Classify each gap by type and severity, and describe every gap purely in behavioural terms.
+export function buildGapAnalysisUserPrompt(originalSpec: string, reverseSpec: string): string {
+	return `Compare the two documents below and produce the list of behavioural gaps as instructed. Classify each gap by type and severity, and describe every gap purely in behavioural terms.
 
 <original_spec>
 ${originalSpec}

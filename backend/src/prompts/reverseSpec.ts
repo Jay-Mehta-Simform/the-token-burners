@@ -52,20 +52,18 @@ Return clear, well-organised plain-language prose grouped under behavioural head
  *   concatenated with lightweight delimiters. The path is provided only so the
  *   model can tell files apart — the output must still avoid naming files.
  */
-export function buildReverseSpecUserPrompt(
-  changedFiles: string | Array<{ path: string; contents: string }>
-): string {
-  const body =
-    typeof changedFiles === "string"
-      ? changedFiles
-      : changedFiles
-          .map(
-            (f) =>
-              `===== BEGIN CHANGED FILE: ${f.path} =====\n${f.contents}\n===== END CHANGED FILE: ${f.path} =====`
-          )
-          .join("\n\n");
+export function buildReverseSpecUserPrompt(changedFiles: string | Array<{ path: string; contents: string }>): string {
+	const body =
+		typeof changedFiles === "string"
+			? changedFiles
+			: changedFiles
+					.map(
+						(f) =>
+							`===== BEGIN CHANGED FILE: ${f.path} =====\n${f.contents}\n===== END CHANGED FILE: ${f.path} =====`,
+					)
+					.join("\n\n");
 
-  return `Below are the full contents of every file changed in this pull request. Infer the behaviour these changes produce and write the behavioural specification as instructed.
+	return `Below are the full contents of every file changed in this pull request. Infer the behaviour these changes produce and write the behavioural specification as instructed.
 
 Remember:
 - Describe only the behaviour introduced or changed by this PR.

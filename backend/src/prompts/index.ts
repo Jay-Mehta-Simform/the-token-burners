@@ -8,6 +8,6 @@
  * All prompts describe and probe BEHAVIOUR, never implementation details.
  */
 
-export * from "./reverseSpec.js";
 export * from "./gapAnalysis.js";
 export * from "./questionGeneration.js";
+export * from "./reverseSpec.js";
