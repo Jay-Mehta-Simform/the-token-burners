@@ -1,58 +1,78 @@
-# Backend - The Token Burners
+# Backend — Intent Drift
 
-This is the backend service for the hackathon project.
+The Express + TypeScript API for Intent Drift. Fetches GitHub PR diffs, runs the 3-step Claude pipeline (reverse spec → gap analysis → questions), and persists analyses to PostgreSQL.
 
-## Tech Stack
-- **Node.js** with **Express**
-- **TypeScript**
-- **Prisma ORM** (PostgreSQL)
-- **AWS S3** (File Uploads via Presigned URLs)
-- **Docker** (Postgres)
+- **Code flow:** [`FLOW.md`](FLOW.md) — request lifecycle, pipeline, status state machine
+- **Module reference:** [`MODULE.md`](MODULE.md) — what every file does
+- **Product spec:** [`../specs/SPEC.md`](../specs/SPEC.md)
+
+## Tech stack
+- **Node.js + Express + TypeScript** (CommonJS; `.js` import extensions)
+- **Prisma ORM** → PostgreSQL (pg pool + `@prisma/adapter-pg`)
+- **Claude Code headless** (subscription) as the AI engine — no Anthropic API key
+- **Octokit + `gh` CLI** for GitHub; **AWS S3** for file artifacts
+- **GitHub OAuth → JWT** auth; **Swagger** at `/api-docs`
 
 ## Prerequisites
-- Node.js (v18+)
-- Docker and Docker Compose
-- AWS Account (S3 Bucket)
+- Node.js v18+
+- Docker + Docker Compose (for local PostgreSQL)
+- `gh` CLI authenticated (`gh auth login`) — used to fetch PR diffs
+- A logged-in Claude Code subscription (`claude` in PATH)
+- AWS S3 credentials + a GitHub OAuth app (client id/secret)
 
-## Setup Instructions
+## Setup
 
-### 1. Environment Variables
-Copy `.env.example` to `.env` and fill in the required values:
 ```bash
+# 1. Environment — copy and fill in DB, AWS, GitHub OAuth, JWT values
 cp .env.example .env
-```
-Ensure `DATABASE_URL` matches your Docker setup (default is provided).
 
-### 2. Start PostgreSQL Database
-Run the following command to start the database using Docker Compose:
-```bash
+# 2. Start PostgreSQL
 docker compose up -d
-```
 
-### 3. Install Dependencies
-```bash
+# 3. Install dependencies
 npm install
-```
 
-### 4. Database Migrations and Prisma Client
-Run the migrations to create the database schema and generate the Prisma Client:
-```bash
-npx prisma migrate dev
-```
-Note: This will also run `prisma generate` automatically.
+# 4. Run migrations + generate the Prisma client
+npm run prisma:migrate
 
-### 5. Start the Development Server
-```bash
+# 5. Start the dev server (nodemon + tsx, hot reload)
 npm run dev
 ```
-The server will be running on `http://localhost:3000`.
 
-## API Endpoints
+Server runs on `http://localhost:3000`. Swagger UI: `http://localhost:3000/api-docs`. API base path: `/api/v1`.
 
-### Uploads
-- `POST /api/upload/presigned-url`: Generate a presigned URL for S3 upload.
-- `POST /api/upload/record`: Save file metadata to the database.
+## Scripts
+
+| Script | What it does |
+|--------|--------------|
+| `npm run dev` | Hot-reload dev server (nodemon + tsx) |
+| `npm run build` | Compile TypeScript to `dist/` |
+| `npm start` | Run compiled output |
+| `npm run prisma:generate` | Regenerate the Prisma client after schema changes |
+| `npm run prisma:migrate` | Create + apply a migration (dev) |
+| `npm run test:reverse-spec -- <PR-url>` | Run step 1 directly against a PR (no HTTP) |
+| `npm run test:gap-questions` | Run steps 2+3 directly (no HTTP) |
+
+## API surface
+
+Auth: `Authorization: Bearer <jwt>` (obtained from the GitHub OAuth flow).
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `GET`  | `/auth/github` · `/auth/github/callback` | GitHub OAuth → JWT |
+| `GET`  | `/projects` · `POST /projects/sync` · `GET /projects/:id/pulls` | Repos & PRs |
+| `POST` | `/analyses` | Trigger analysis (async → `{ analysis_id }`) |
+| `GET`  | `/analyses/:id` | Poll status + reverse spec + gaps + questions |
+| `PATCH`| `/analyses/:id/spec` | Provide spec → gap analysis + questions |
+| `PATCH`| `/analyses/:id/answers` · `POST /analyses/:id/submit` | Answer & submit (Respondent) |
+| `GET`  | `/analyses/:id/export` | Decision Record as Markdown |
+| `POST` | `/analyses/:id/retrigger` | Re-run on latest commit |
+| `POST` | `/compare-spec` | Stateless steps 2+3 (no auth, no DB) |
+| `POST` | `/files/presigned-url` · `POST /files/register` | S3 upload helpers |
+
+See [`FLOW.md`](FLOW.md) for the full request and pipeline flow.
 
 ## Notes
-- The `generated/` folder is excluded from version control as it contains environment-specific Prisma code.
-- Always run `npx prisma generate` after changing the schema.
+- The `generated/` folder (Prisma client) is environment-specific — regenerate with `npm run prisma:generate` after any `schema.prisma` change.
+- **Never commit or read `.env`** — it holds real secrets. Use `.env.example` as the reference.
+- The AI pipeline uses Claude headless, not the `langchain.ts`/OpenAI singleton (which is currently unused).
