@@ -24,7 +24,9 @@ After any `prisma/schema.prisma` change, run `npm run prisma:generate` before st
 - `prisma.ts` — single `PrismaClient`. The generated client lives at `generated/prisma/` (not `@prisma/client`). Import Prisma types from `../../generated/prisma/index.js`.
 - `langchain.ts` — pre-configured `ChatOpenAI` (`gpt-4o-mini`). Build LangChain chains/agents in `src/services/` and use this singleton.
 
-**Error handling:** throw an object matching `AppError` (`src/middleware/errorHandler.ts`) with optional `statusCode`; the global handler converts it to a JSON response.
+**Error handling:** throw an object matching `AppError` (`src/middleware/errorHandler.ts`) with optional `statusCode`; the global handler converts it to a JSON response. Use the `httpError(statusCode, message)` helper in `src/lib/httpError.ts`.
+
+**Intent Drift AI pipeline:** uses Claude Code headless (subscription) via `src/lib/claudeRunner.ts` — not the LangChain/OpenAI singleton (currently unused). Prompts in `src/prompts/` (one file per step; step 1 `reverseSpec.ts` wired, steps 2–3 placeholders), config in `src/config/claude.ts`. Step 1: `POST /api/reverse-spec { prNumber, repo? }` → `gh pr diff` → Claude → typed JSON. Stateless. Fast test: `npm run test:reverse-spec -- <prNumber> [owner/repo]`. Requires `gh` auth + a Claude subscription login.
 
 # Constraints
 
