@@ -1,5 +1,8 @@
 import { Router } from "express";
-import { reverseSpecController } from "../controllers/reverseSpecController.js";
+import fileRoutes from "./fileRoutes.js";
+import userRoutes from "./userRoutes.js";
+import { analysisController } from "../controllers/analysisController.js";
+import { authenticate } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -7,7 +10,10 @@ router.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
-// Intent Drift — pipeline step 1: Reverse Spec Generation from a GitHub PR diff.
-router.post("/reverse-spec", reverseSpecController);
+router.use("/files", fileRoutes);
+router.use("/", userRoutes);
+
+// Intent Drift — trigger full analysis pipeline: PR diff → reverse spec → S3 upload → DB record.
+router.post("/analyses", authenticate, analysisController);
 
 export default router;
