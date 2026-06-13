@@ -1,0 +1,52 @@
+/* Global resets and scrollbar styling — mirrored from the design's <helmet> block. */
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--paper);
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+  background: var(--paper);
+  font-family: var(--font-sans);
+  color: var(--t-body);
+  -webkit-font-smoothing: antialiased;
+  font-size: 14px;
+}
+
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-thumb { background: #CFCFCB; border-radius: 0; border: 3px solid var(--paper); }
+::-webkit-scrollbar-thumb:hover { background: #B8B8B3; }
+
+@keyframes idspin { to { transform: rotate(360deg); } }
+@keyframes idpulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+@keyframes idblink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+
+textarea { font-family: var(--font-sans); }
+button { font-family: var(--font-sans); }
+
+/* Markdown rendering inside the dark reverse-spec terminal panel.
+   The reverse spec is free-form AI text rendered as Markdown (see SPEC.md). */
+.md-reverse-spec { font-family: var(--font-mono); font-size: 12.5px; line-height: 1.7; color: var(--code-text); }
+.md-reverse-spec h1, .md-reverse-spec h2, .md-reverse-spec h3 {
+  font-family: var(--font-mono); color: #fff; font-size: 13.5px; font-weight: 700;
+  letter-spacing: 0.04em; margin: 0 0 8px; text-transform: none;
+}
+.md-reverse-spec h1:not(:first-child), .md-reverse-spec h2:not(:first-child), .md-reverse-spec h3:not(:first-child) { margin-top: 16px; }
+.md-reverse-spec p { margin: 0 0 10px; }
+.md-reverse-spec p:last-child { margin-bottom: 0; }
+.md-reverse-spec ul, .md-reverse-spec ol { margin: 0 0 10px; padding-left: 20px; }
+.md-reverse-spec li { margin: 0 0 4px; }
+.md-reverse-spec code { color: var(--code-key); background: rgba(255,255,255,0.05); padding: 1px 5px; border-radius: 3px; }
+.md-reverse-spec strong { color: #fff; }
+.md-reverse-spec a { color: var(--code-fn); }
+
+/* Markdown rendering inside light gap description / answer blocks. */
+.md-inline p { margin: 0 0 8px; }
+.md-inline p:last-child { margin-bottom: 0; }
+.md-inline ul, .md-inline ol { margin: 0 0 8px; padding-left: 20px; }
+.md-inline code { font-family: var(--font-mono); background: var(--surface); padding: 1px 5px; border-radius: 3px; font-size: 0.92em; }
+.md-inline strong { color: var(--t-strong); }

@@ -70,7 +70,7 @@ Three sequential Anthropic Claude calls, server-side. Each uses structured outpu
 ### Step 1 — Reverse Spec Generation
 - **Input:** full file contents of changed files.
 - **Instruction:** describe what the code actually does in plain language, inferring behaviour purely from implementation. The model must NOT be given the original Spec at this step.
-- **Output:** plain-language reverse specification (text).
+- **Output:** plain-language reverse specification, formatted as **Markdown** (see "Markdown vs JSON outputs" below). Stored verbatim in `analyses.reverse_spec`.
 
 ### Step 2 — Gap Analysis
 - **Input:** the Reverse Spec (from step 1) + the original Spec (from the user).
@@ -99,6 +99,15 @@ Three sequential Anthropic Claude calls, server-side. Each uses structured outpu
   ```
 
 ---
+
+### Markdown vs JSON outputs (frontend rendering decision)
+
+The MVP renders **AI free-form text as Markdown** rather than treating it as an opaque string:
+
+- **Reverse Spec (Step 1):** the model returns Markdown (headings, bold, inline `code`, lists). `reverse_spec` is stored as a raw Markdown string and rendered with `react-markdown` (`remark-gfm`) inside the dark "reverse spec" terminal panel on the frontend. The backend does **not** need to wrap it in JSON — a plain Markdown string in the field is sufficient.
+- **Gaps (Step 2) & Questions (Step 3):** these stay **structured JSON** as defined below. The UI fundamentally depends on the per-gap `type`/`severity` classification and per-question inline answering (severity chips, type marks, answer textareas, submit gating), so they cannot collapse into a single Markdown blob. Their free-text fields (`gaps.description`, `questions.text`, `gaps.answer`) MAY contain inline Markdown and are rendered through the same Markdown renderer.
+
+In short: **Step 1 → Markdown string; Steps 2 & 3 → structured records whose text fields are Markdown-capable.** The frontend (`frontend/src/lib/Markdown.jsx`) is the single rendering point.
 
 ## 6. Data model (PostgreSQL)
 
