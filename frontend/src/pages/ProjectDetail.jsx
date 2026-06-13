@@ -8,7 +8,7 @@ import { prKey, ctaFor, findRepo } from '../lib/derive.js'
 export default function ProjectDetail({ state, actions }) {
   const { view, analyses } = state
   const r = findRepo(view.id) || repos()[0]
-  const tab = view.tab || 'overview'
+  const tab = view.tab || 'prs'
 
   const repoPRs = prs().filter((p) => p.repoId === r.id)
   const repoAnalysisKeys = Object.keys(analyses).filter((k) => k.split('#')[0] === r.id)
@@ -18,10 +18,8 @@ export default function ProjectDetail({ state, actions }) {
   const statusFor = (p) => { const a = analyses[prKey(p)]; return a ? a.status : 'none' }
 
   const tabDef = [
-    { id: 'overview', label: 'Overview', badge: null },
     { id: 'prs', label: 'Pull Requests', badge: String(r.openPRs) },
     { id: 'analyses', label: 'Analyses & Reports', badge: repoAnalysisKeys.length ? String(repoAnalysisKeys.length) : null },
-    { id: 'settings', label: 'Settings', badge: null },
   ]
 
   return (
@@ -50,12 +48,8 @@ export default function ProjectDetail({ state, actions }) {
         })}
       </div>
 
-      {tab === 'overview' && (
-        <Overview r={r} repoPRs={repoPRs} repoAnalysisKeys={repoAnalysisKeys} reportCountForRepo={reportCountForRepo} openGaps={openGaps} statusFor={statusFor} state={state} actions={actions} />
-      )}
       {tab === 'prs' && <PRsTab repoPRs={repoPRs} statusFor={statusFor} actions={actions} />}
       {tab === 'analyses' && <AnalysesTab r={r} repoAnalysisKeys={repoAnalysisKeys} analyses={analyses} actions={actions} />}
-      {tab === 'settings' && <RepoSettings r={r} />}
     </div>
   )
 }
