@@ -7,18 +7,15 @@
  * frontend renderer (frontend/src/lib/meta.jsx).
  */
 
-/** Confidence the model assigns to its own reverse-spec reconstruction. */
-export type Confidence = "high" | "medium" | "low";
-
 /**
  * Step 1 — Reverse Spec Generation.
- * A plain-language description of what a diff ACTUALLY does, inferred purely
- * from the implementation.
+ * A plain-language, Markdown-formatted description of what a diff ACTUALLY does,
+ * inferred purely from the implementation. The model returns prose (not JSON);
+ * `reverse_spec` holds that Markdown verbatim and is fed straight into the gap
+ * analysis step and rendered as-is on the frontend.
  */
 export interface ReverseSpecResult {
-  files_changed: string[];
   reverse_spec: string;
-  confidence: Confidence;
 }
 
 /** Metadata about a single Claude run, surfaced for cost/observability. */

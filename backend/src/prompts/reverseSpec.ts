@@ -42,7 +42,7 @@ For the behaviour introduced or changed by this PR, describe as applicable:
 - Defaults and implicit decisions: behaviour that occurs without the user asking for it.
 
 ## Output format
-Return clear, well-organised plain-language prose grouped under behavioural headings (e.g. "Triggering an analysis", "Validation", "Failure handling"). Use bullet points for discrete rules. Be precise and complete but do not pad. If a behaviour is conditional, state the condition and the resulting behaviour. If the code's behaviour in some situation is genuinely ambiguous or undefined, say so explicitly rather than inventing it.`;
+Return clear, well-organised plain-language prose as **Markdown**. Group behaviour under Markdown headings (e.g. "## Triggering an analysis", "## Validation", "## Failure handling") and use Markdown bullet points for discrete rules. Do NOT return JSON and do NOT wrap the whole response in a code fence — emit the Markdown document directly. Be precise and complete but do not pad. If a behaviour is conditional, state the condition and the resulting behaviour. If the code's behaviour in some situation is genuinely ambiguous or undefined, say so explicitly rather than inventing it.`;
 
 /**
  * Builds the user message for reverse-spec generation.

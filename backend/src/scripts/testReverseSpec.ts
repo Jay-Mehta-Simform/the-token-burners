@@ -51,8 +51,8 @@ async function main(): Promise<void> {
 
   const { result, meta } = await generateReverseSpec(diff);
 
-  console.log("=== Reverse Spec ===");
-  console.log(JSON.stringify(result, null, 2));
+  console.log("=== Reverse Spec (Markdown) ===");
+  console.log(result.reverse_spec);
   console.log("\n=== Run metadata ===");
   console.log(meta);
 }
