@@ -1,4 +1,26 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "instructions": ["backend/AGENTS.md"]
+  "instructions": [
+    "backend/AGENTS.md"
+  ],
+  "permission": {
+    "bash": {
+      "npm run dev": "allow",
+      "npm run build": "allow",
+      "npm run start": "allow",
+      "npm install *": "allow",
+      "npx prisma generate": "allow",
+      "npx prisma migrate dev*": "allow",
+      "npx prisma migrate reset*": "allow",
+      "npx prisma db push*": "allow",
+      "npx prisma db pull": "allow",
+      "npx prisma studio": "allow",
+      "npx prisma format": "allow",
+      "npx tsc --noEmit": "allow",
+      "npx tsc*": "allow"
+    },
+    "read": {
+      ".env": "deny"
+    }
+  },
 }
