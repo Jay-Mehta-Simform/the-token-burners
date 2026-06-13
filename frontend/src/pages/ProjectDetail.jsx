@@ -195,7 +195,7 @@ function RepoSettings({ r }) {
     { k: 'Last synced', v: r.synced },
   ]
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 640 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ background: 'var(--paper)', border: '1px solid var(--hairline)', padding: '18px 20px' }}>
         <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700, color: 'var(--t-strong)' }}>Repository connection</span>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 14 }}>
