@@ -1,12 +1,12 @@
 services:
   postgres:
-    image: postgres:latest
+    image: postgres:17
     container_name: hackathon_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: hackathon_db
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: hackathon_postgres
     ports:
       - "5432:5432"
     volumes:
