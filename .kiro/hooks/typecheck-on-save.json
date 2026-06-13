@@ -1,0 +1,13 @@
+{
+  "name": "Typecheck on TypeScript Save",
+  "version": "1.0.0",
+  "description": "Run tsc --noEmit whenever a TypeScript file in the backend is saved. Surfaces type errors immediately.",
+  "when": {
+    "type": "fileEdited",
+    "patterns": ["backend/src/**/*.ts"]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "cd backend && npx tsc --noEmit 2>&1 | head -50"
+  }
+}
