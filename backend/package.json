@@ -8,6 +8,7 @@
     "dev": "nodemon --watch 'src/**/*.ts' --exec tsx src/index.ts",
     "start": "node dist/index.js",
     "test:reverse-spec": "ts-node src/scripts/testReverseSpec.ts",
+    "test:gap-questions": "ts-node src/scripts/testGapQuestions.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
   },
@@ -19,12 +20,15 @@
     "@aws-sdk/s3-request-presigner": "^3.1068.0",
     "@langchain/core": "^1.1.49",
     "@langchain/openai": "^1.4.7",
+    "@octokit/rest": "^22.0.1",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "axios": "^1.17.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "joi": "^18.2.1",
     "jsonwebtoken": "^9.0.3",
     "langchain": "^1.4.5",
     "multer": "^2.1.1",
@@ -33,6 +37,7 @@
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",

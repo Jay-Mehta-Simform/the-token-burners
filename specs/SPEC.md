@@ -14,15 +14,15 @@ A developer links their GitHub account to the Intent Drift portal. They see all 
 
 ## 2. Tech stack
 
-| Layer | Choice |
-|---|---|
-| Frontend | React (single-page application) |
-| Backend | Node.js |
-| Database | PostgreSQL (persist everything) |
-| LLM provider | Claude Code headless (subscription, `claude-sonnet-4-6`) — driven via `claude -p` stdin, no API key |
-| Auth | GitHub OAuth (only login method) |
-| GitHub integration | `gh` CLI (`gh pr diff`) — authenticated via `gh auth login` or `GH_TOKEN` |
-| Pipeline execution | Async on backend; frontend polls for status |
+| Layer              | Choice                                                                                              |
+| ------------------ | --------------------------------------------------------------------------------------------------- |
+| Frontend           | React (single-page application)                                                                     |
+| Backend            | Node.js                                                                                             |
+| Database           | PostgreSQL (persist everything)                                                                     |
+| LLM provider       | Claude Code headless (subscription, `claude-sonnet-4-6`) — driven via `claude -p` stdin, no API key |
+| Auth               | GitHub OAuth (only login method)                                                                    |
+| GitHub integration | `gh` CLI (`gh pr diff`) — authenticated via `gh auth login` or `GH_TOKEN`                           |
+| Pipeline execution | Async on backend; frontend polls for status                                                         |
 
 ---
 
@@ -32,7 +32,7 @@ A developer links their GitHub account to the Intent Drift portal. They see all 
 
 - **Project** — a GitHub repository, one-to-one. Synced from GitHub.
 - **Analysis** — one run of the AI pipeline on a PR. States: `analyzing → ready → completed | failed`.
-- **Spec (Original Specification)** — human-authored intended behaviour, provided by the user at trigger time (paste or upload).
+- **Spec (Original Specification)** — human-authored intended behaviour, provided by the user at trigger time (paste or upload). Uploads are **additive and versioned**: each uploaded spec file is stored with a timestamp suffix and never overwrites an earlier one. When several versions exist, the one with the **latest timestamp is authoritative**; older versions are treated as superseded (their changed decisions are redundant) and are used only as historical context.
 - **Code Input** — the unified diff of all files changed in the PR, fetched by the backend via `gh pr diff`. The user provides only the PR link; the backend resolves the diff automatically.
 - **Reverse Spec** — AI-generated plain-language description of what the code actually does, inferred from implementation alone.
 - **Gap** — a divergence between Spec and Reverse Spec. Classified by `type` (missing feature | deviation | undocumented addition) and `severity`.
@@ -48,15 +48,16 @@ A developer links their GitHub account to the Intent Drift portal. They see all 
 2. **Project list** — all repositories the user has GitHub access to appear automatically as Projects.
 3. **PR list** — inside a Project, the user sees open pull requests for that repo.
 4. **Trigger Analysis** — on a PR, the user clicks "Analyze", pastes or uploads the original Spec, and confirms.
-   - The user provides the PR link (e.g. `https://github.com/owner/repo/pull/123`). The backend parses the link and fetches the PR diff via `gh pr diff` — no manual file pasting required.
-   - Backend locks the PR (first-write-wins). If an Analysis is already `analyzing`, the trigger is rejected with "Analysis already in progress".
-   - The triggering user becomes the **Respondent**.
+    - The user provides the PR link (e.g. `https://github.com/owner/repo/pull/123`). The backend parses the link and fetches the PR diff via `gh pr diff` — no manual file pasting required.
+    - Backend locks the PR (first-write-wins). If an Analysis is already `analyzing`, the trigger is rejected with "Analysis already in progress".
+    - The triggering user becomes the **Respondent**.
 5. **Analyzing** — backend fetches the PR diff via `gh pr diff` and runs the 3-step pipeline. Frontend polls for status.
 6. **Ready** — gaps and questions are displayed. Respondent answers each question inline.
 7. **Submit** — submit button is enabled only when every question has an answer. On submit, Analysis → `completed`.
 8. **Decision Record** — on-screen summary view + Markdown download. Visible to all repo members (read-only for non-Respondents).
 
 ### Edge cases
+
 - **Re-trigger:** Only one active Analysis per PR. Manually re-triggering replaces the previous one and resets all answers.
 - **Stale:** If new commits are pushed after an Analysis is `ready` or `completed`, show a stale warning banner. Do not auto re-trigger.
 - **Failure:** If any LLM call fails, Analysis → `failed`. Show an error state with a retry option (never an infinite spinner).
@@ -69,37 +70,61 @@ A developer links their GitHub account to the Intent Drift portal. They see all 
 Three sequential Claude Code headless calls, server-side. The backend fetches all GitHub content itself and passes it as plain text to Claude via stdin (`tools: []`). No Anthropic API key required — uses the Claude subscription login. Structured output is achieved via JSON-only prompts + backend parse/validate.
 
 ### Step 1 — Reverse Spec Generation
+
 - **Input:** the PR diff (fetched by backend via `gh pr diff`; passed as text — Claude does not call any tools).
 - **Instruction:** describe what the code actually does in plain language, inferring behaviour purely from implementation. The model must NOT be given the original Spec at this step.
-- **Output:** JSON `{ files_changed: string[], reverse_spec: string, confidence: "high"|"medium"|"low" }`.
+- **Output:** plain-language reverse specification, formatted as **Markdown** (see "Markdown vs JSON outputs" below). Stored verbatim in `analyses.reverse_spec`.
 
 ### Step 2 — Gap Analysis
-- **Input:** the Reverse Spec (from step 1) + the original Spec (from the user).
-- **Instruction:** compare them and return a list of gaps.
+
+- **Input:** the Reverse Spec (from step 1) + the original Spec (from the user). The original Spec may be supplied as **multiple timestamped versions** (spec uploads are additive — see §3). The backend orders them oldest → newest and the prompt marks the most recent as **authoritative**; older versions are explicitly flagged as superseded.
+- **Instruction:** compare the implementation against the **latest** Spec and return a list of gaps. Do **not** raise gaps for decisions that exist only in an older, superseded version — newer decisions override older ones.
 - **Output (structured):** array of gaps, each:
-  ```json
-  {
-    "id": "string",
-    "title": "string",
-    "description": "string",
-    "type": "missing_feature | deviation | undocumented_addition",
-    "severity": "low | medium | high"
-  }
-  ```
+    ```json
+    {
+      "id": "string",
+      "title": "string",
+      "description": "string",
+      "type": "missing_feature | deviation | undocumented_addition",
+      "severity": "low | medium | high"
+    }
+    ```
 
 ### Step 3 — Question Generation
+
 - **Input:** the list of gaps from step 2.
-- **Instruction:** for each gap, generate one or more specific, answerable questions (not vague flags).
-- **Output (structured):** array of questions, each:
-  ```json
-  {
-    "id": "string",
-    "gap_id": "string",
-    "text": "string"
-  }
-  ```
+- **Instruction:** for each gap, generate **exactly one** specific, answerable question (not a vague flag). One gap → one question → one answer field on the frontend.
+- **Output (structured JSON, not Markdown):** array of questions, each:
+    ```json
+    {
+      "gap_id": "string",
+      "question": "string"
+    }
+    ```
+- **Merge:** the backend joins each question onto its gap and adds an empty `answer`, producing the **frontend-ready** record the UI renders and the Respondent answers:
+    ```json
+    {
+      "id": "string",
+      "title": "string",
+      "description": "string",
+      "type": "missing_feature | deviation | undocumented_addition",
+      "severity": "low | medium | high",
+      "question": "string",
+      "answer": "string"
+    }
+    ```
+  Answers are managed per gap as structured JSON (never a Markdown blob): each answer is saved against its `gap_id`, and submission is gated on every gap having a non-empty `answer`.
 
 ---
+
+### Markdown vs JSON outputs (frontend rendering decision)
+
+The MVP renders **AI free-form text as Markdown** rather than treating it as an opaque string:
+
+- **Reverse Spec (Step 1):** the model returns Markdown (headings, bold, inline `code`, lists). `reverse_spec` is stored as a raw Markdown string and rendered with `react-markdown` (`remark-gfm`) inside the dark "reverse spec" terminal panel on the frontend. The backend does **not** need to wrap it in JSON — a plain Markdown string in the field is sufficient.
+- **Gaps (Step 2) & Questions (Step 3):** these stay **structured JSON** as defined below. The UI fundamentally depends on the per-gap `type`/`severity` classification and per-gap inline answering (severity chips, type marks, answer textareas, submit gating), so they cannot collapse into a single Markdown blob. Each gap carries exactly one `question` and one `answer`. Their free-text fields (`gap.description`, `gap.question`, `gap.answer`) MAY contain inline Markdown and are rendered through the same Markdown renderer.
+
+In short: **Step 1 → Markdown string; Steps 2 & 3 → structured records whose text fields are Markdown-capable.** The frontend (`frontend/src/lib/Markdown.jsx`) is the single rendering point.
 
 ## 6. Data model (PostgreSQL)
 
@@ -143,8 +168,8 @@ gaps
 
 questions
   id              PK
-  gap_id          FK -> gaps
-  text
+  gap_id          FK -> gaps          (one question per gap)
+  question        text
   answer          text nullable       (filled by respondent)
 ```
 
@@ -154,17 +179,17 @@ questions
 
 ## 7. API surface (backend)
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| GET | `/auth/github` | Begin GitHub OAuth |
-| GET | `/auth/github/callback` | OAuth callback; create/lookup user, store token |
-| GET | `/api/projects` | List repos the user has access to |
-| GET | `/api/projects/:id/pulls` | List open PRs for a repo |
-| POST | `/api/analyses` | Trigger Analysis. Body: `{ pr_url, original_spec }` — backend parses `pr_url` to extract owner/repo/PR number and fetches the diff. Locks PR (first-write-wins). Returns `{ analysis_id }`. |
-| GET | `/api/analyses/:id` | Poll Analysis status + gaps + questions + answers |
-| PATCH | `/api/analyses/:id/answers` | Save answer(s). Body: `{ question_id, answer }` |
-| POST | `/api/analyses/:id/submit` | Submit. Rejected unless all questions answered. Sets `completed`. |
-| GET | `/api/analyses/:id/export` | Download Decision Record as Markdown |
+| Method | Endpoint                    | Purpose                                                                                                                                                                                     |
+| ------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/auth/github`              | Begin GitHub OAuth                                                                                                                                                                          |
+| GET    | `/auth/github/callback`     | OAuth callback; create/lookup user, store token                                                                                                                                             |
+| GET    | `/api/projects`             | List repos the user has access to                                                                                                                                                           |
+| GET    | `/api/projects/:id/pulls`   | List open PRs for a repo                                                                                                                                                                    |
+| POST   | `/api/analyses`             | Trigger Analysis. Body: `{ pr_url, original_spec }` — backend parses `pr_url` to extract owner/repo/PR number and fetches the diff. Locks PR (first-write-wins). Returns `{ analysis_id }`. |
+| GET    | `/api/analyses/:id`         | Poll Analysis status + gaps + questions + answers                                                                                                                                           |
+| PATCH  | `/api/analyses/:id/answers` | Save answer(s). Body: `{ question_id, answer }`                                                                                                                                             |
+| POST   | `/api/analyses/:id/submit`  | Submit. Rejected unless all questions answered. Sets `completed`.                                                                                                                           |
+| GET    | `/api/analyses/:id/export`  | Download Decision Record as Markdown                                                                                                                                                        |
 
 ---
 

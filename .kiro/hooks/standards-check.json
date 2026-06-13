@@ -1,0 +1,13 @@
+{
+  "name": "Standards Check on Write",
+  "version": "1.0.0",
+  "description": "Before writing any source file, verify the change follows project coding standards — JSDoc, explicit types, no implicit any, correct import paths.",
+  "when": {
+    "type": "preToolUse",
+    "toolTypes": ["write"]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Before writing this file, verify the content you're about to write follows the Intent Drift coding standards from .kiro/steering/instructions.md: JSDoc on every function, Swagger annotations on every route, no implicit `any`, explicit return types, `.js` extensions on local imports, AppError for error handling, named exports not default classes. If the content violates any standard, fix it before writing."
+  }
+}

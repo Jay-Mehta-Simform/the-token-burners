@@ -2,7 +2,8 @@
  * reverseSpecService — pipeline step 1.
  *
  * Hands a code diff to Claude (headless, subscription) with the reverse-spec
- * prompts and no tools, then parses + validates the structured JSON result.
+ * prompts and no tools. The model returns the reverse spec as plain Markdown
+ * prose (not JSON), which is used verbatim by the comparison step.
  */
 
 import { runClaude } from "../lib/claudeRunner.js";
@@ -17,44 +18,25 @@ import {
   CLAUDE_PERMISSION_MODE,
   MAX_DIFF_CHARS,
 } from "../config/claude.js";
-import type { Confidence, ReverseSpecResult, RunMeta } from "../types/intentDrift.js";
+import type { ReverseSpecResult, RunMeta } from "../types/intentDrift.js";
 
-const VALID_CONFIDENCE: Confidence[] = ["high", "medium", "low"];
+/**
+ * Normalise the model's Markdown output. The reverse spec is consumed as prose,
+ * so we only trim surrounding whitespace and peel off a single fenced block if
+ * the model wrapped the entire response in one. Throws (502) if empty.
+ */
+function toReverseSpec(raw: string): ReverseSpecResult {
+  let md = raw.trim();
 
-/** Strip accidental code fences, then JSON.parse. Throws (502) if unparseable. */
-function parseJsonResult(raw: string): unknown {
-  const cleaned = raw.trim().replace(/^```(?:json)?\s*|\s*```$/g, "");
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    throw httpError(502, `Model did not return valid JSON:\n${raw.slice(0, 500)}`);
-  }
-}
+  // If the whole response is a single ```...``` fence, unwrap it.
+  const fenced = md.match(/^```(?:markdown|md)?\s*\n([\s\S]*?)\n```$/);
+  if (fenced) md = fenced[1].trim();
 
-/** Validate the parsed object against the ReverseSpecResult contract. */
-function validateReverseSpec(obj: unknown): ReverseSpecResult {
-  const o = obj as Record<string, unknown>;
-  const errs: string[] = [];
-
-  if (!Array.isArray(o.files_changed) || !o.files_changed.every((f) => typeof f === "string")) {
-    errs.push("files_changed must be string[]");
-  }
-  if (typeof o.reverse_spec !== "string" || !o.reverse_spec.trim()) {
-    errs.push("reverse_spec must be a non-empty string");
-  }
-  if (!VALID_CONFIDENCE.includes(o.confidence as Confidence)) {
-    errs.push('confidence must be "high" | "medium" | "low"');
+  if (!md) {
+    throw httpError(502, "Reverse-spec generation returned an empty response.");
   }
 
-  if (errs.length) {
-    throw httpError(502, `Reverse-spec output failed validation: ${errs.join("; ")}`);
-  }
-
-  return {
-    files_changed: o.files_changed as string[],
-    reverse_spec: o.reverse_spec as string,
-    confidence: o.confidence as Confidence,
-  };
+  return { reverse_spec: md };
 }
 
 export interface ReverseSpecRun {
@@ -92,7 +74,7 @@ export async function generateReverseSpec(diff: string): Promise<ReverseSpecRun>
     throw httpError(502, `Claude run reported an error (see budget/limits). session=${run.sessionId}`);
   }
 
-  const result = validateReverseSpec(parseJsonResult(run.result));
+  const result = toReverseSpec(run.result);
 
   return {
     result,

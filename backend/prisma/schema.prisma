@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
@@ -12,25 +10,42 @@ datasource db {
   provider = "postgresql"
 }
 
+enum AnalysisStatus {
+  analyzing
+  ready
+  comparing
+  questions_ready
+  completed
+  failed
+}
+
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
-  name      String?
-  githubId  String?   @unique
-  avatarUrl String?
-  projects  Project[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          String     @id @default(uuid())
+  email       String     @unique
+  name        String?
+  githubId    String?    @unique
+  githubLogin String?
+  avatarUrl   String?
+  oauthToken  String?
+  projects    Project[]
+  analyses    Analysis[] @relation("AnalysisRespondent")
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 }
 
 model Project {
-  id        String   @id @default(uuid())
-  name      String
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  files     File[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String     @id @default(uuid())
+  name          String
+  githubRepoId  String?    @unique
+  owner         String?
+  defaultBranch String?
+  lang          String?
+  userId        String
+  user          User       @relation(fields: [userId], references: [id])
+  files         File[]
+  analyses      Analysis[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 }
 
 model File {
@@ -42,4 +57,51 @@ model File {
   project   Project  @relation(fields: [projectId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Analysis {
+  id           String         @id @default(uuid())
+  projectId    String
+  project      Project        @relation(fields: [projectId], references: [id])
+  prNumber     Int
+  prHeadSha    String
+  respondentId String
+  respondent   User           @relation("AnalysisRespondent", fields: [respondentId], references: [id])
+  originalSpec String?
+  reverseSpec  String?
+  status       AnalysisStatus @default(analyzing)
+  isStale      Boolean        @default(false)
+  errorMessage String?
+  costUsd      Float?
+  sessionId    String?
+  createdAt    DateTime       @default(now())
+  completedAt  DateTime?
+  updatedAt    DateTime       @updatedAt
+  gaps         Gap[]
+
+  @@unique([projectId, prNumber])
+}
+
+model Gap {
+  id          String     @id @default(uuid())
+  analysisId  String
+  analysis    Analysis   @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  gapKey      String
+  title       String
+  description String
+  type        String
+  severity    String
+  questions   Question[]
+  createdAt   DateTime   @default(now())
+}
+
+model Question {
+  id          String   @id @default(uuid())
+  gapId       String
+  gap         Gap      @relation(fields: [gapId], references: [id], onDelete: Cascade)
+  questionKey String
+  text        String
+  answer      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

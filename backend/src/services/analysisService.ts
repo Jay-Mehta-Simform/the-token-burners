@@ -1,99 +1,255 @@
 /**
- * analysisService — orchestrates the full Intent Drift step-1 pipeline:
- *   PR URL → gh pr diff → Claude reverse spec → Markdown → S3 upload → DB File record
+ * analysisService — orchestrates the full Intent Drift pipeline across all three steps.
+ *
+ * Step 1 (reverse spec) fires on POST /api/analyses.
+ * Steps 2+3 (gap analysis + question generation) fire on PATCH /api/analyses/:id/spec.
+ * All AI work runs in a fire-and-forget background job; the Analysis row tracks status.
  */
 
 import { prisma } from "../lib/prisma.js";
 import { fetchPrDiff } from "./githubService.js";
 import { generateReverseSpec } from "./reverseSpecService.js";
-import { uploadBuffer } from "./uploadService.js";
-import { ReverseSpecResult, RunMeta } from "../types/intentDrift.js";
+import { generateGapAnalysis } from "./gapAnalysisService.js";
+import { generateQuestions } from "./questionGenerationService.js";
 import { httpError } from "../lib/httpError.js";
 
-export interface AnalysisResult {
-  prNumber: number;
-  repo: string;
-  reverseSpec: ReverseSpecResult;
-  meta: RunMeta;
-  s3Url: string;
-  s3Key: string;
-  fileId: string;
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+async function markFailed(analysisId: string, message: string): Promise<void> {
+  await prisma.analysis.update({
+    where: { id: analysisId },
+    data: { status: "failed", errorMessage: message },
+  }).catch(() => {/* swallow — DB might be unavailable */});
 }
 
-/** Convert the reverse spec result to a human-readable Markdown document. */
-function toMarkdown(
-  prNumber: number,
-  repo: string,
-  result: ReverseSpecResult,
-  generatedAt: string
-): string {
-  const fileList = result.files_changed.map((f) => `- ${f}`).join("\n");
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
-  return [
-    `# Reverse Spec — PR #${prNumber} (${repo})`,
-    "",
-    `**Confidence:** ${result.confidence}`,
-    `**Files changed:** ${result.files_changed.length}`,
-    `**Generated:** ${generatedAt}`,
-    "",
-    "## Files Changed",
-    "",
-    fileList,
-    "",
-    "## What This Change Actually Does",
-    "",
-    result.reverse_spec,
-  ].join("\n");
+/**
+ * Trigger a new analysis for a PR.
+ * Acquires per-PR lock (409 if already analyzing/comparing).
+ * Returns immediately with { analysisId }; Step 1 runs in the background.
+ */
+export async function createAnalysis(
+  projectId: string,
+  prNumber: number,
+  userId: string,
+  originalSpec?: string
+): Promise<{ analysisId: string }> {
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) throw httpError(404, `Project ${projectId} not found.`);
+
+  // Per-PR lock: 409 if an active analysis already exists.
+  const existing = await prisma.analysis.findUnique({
+    where: { projectId_prNumber: { projectId, prNumber } },
+  });
+  if (existing && (existing.status === "analyzing" || existing.status === "comparing")) {
+    throw httpError(409, `An analysis for PR #${prNumber} is already in progress (status: ${existing.status}).`);
+  }
+
+  let analysis;
+  if (existing) {
+    // Reset an existing completed/failed/ready row in-place.
+    await prisma.gap.deleteMany({ where: { analysisId: existing.id } });
+    analysis = await prisma.analysis.update({
+      where: { id: existing.id },
+      data: {
+        respondentId: userId,
+        prHeadSha: "pending",
+        originalSpec: originalSpec ?? null,
+        reverseSpec: null,
+        status: "analyzing",
+        isStale: false,
+        errorMessage: null,
+        costUsd: null,
+        sessionId: null,
+        completedAt: null,
+      },
+    });
+  } else {
+    analysis = await prisma.analysis.create({
+      data: {
+        projectId,
+        prNumber,
+        prHeadSha: "pending",
+        respondentId: userId,
+        originalSpec: originalSpec ?? null,
+        status: "analyzing",
+      },
+    });
+  }
+
+  // Fire and forget — never await this.
+  setImmediate(() =>
+    runAnalysisPipeline(analysis.id).catch((err) =>
+      markFailed(analysis.id, err?.message ?? "Unknown error")
+    )
+  );
+
+  return { analysisId: analysis.id };
 }
 
 /**
- * Run the full step-1 analysis for a PR:
- *   1. Fetch diff via `gh pr diff`
- *   2. Generate reverse spec via Claude headless
- *   3. Serialise to Markdown and upload to S3
- *   4. Save a File record in the DB linked to the project
- *
- * @param prUrl      Full GitHub PR URL, e.g. https://github.com/owner/repo/pull/123
- * @param projectId  DB Project.id — the project this analysis belongs to
+ * Provide (or replace) the original spec on a ready analysis.
+ * Triggers Steps 2+3 in the background.
  */
-export async function runAnalysis(prUrl: string, projectId: string): Promise<AnalysisResult> {
-  // Parse PR URL → owner/repo + prNumber
-  const match = prUrl.match(/^https?:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/pull\/(\d+)/);
-  if (!match) {
-    throw httpError(400, 'prUrl must be a valid GitHub PR URL, e.g. "https://github.com/owner/repo/pull/123".');
+export async function provideSpec(
+  analysisId: string,
+  userId: string,
+  spec: string
+): Promise<void> {
+  const analysis = await prisma.analysis.findUnique({ where: { id: analysisId } });
+  if (!analysis) throw httpError(404, "Analysis not found.");
+  if (analysis.respondentId !== userId) {
+    throw httpError(403, "Only the Respondent can provide the spec.");
   }
-  const repo = `${match[1]}/${match[2]}`;
-  const prNumber = Number(match[3]);
-
-  // Verify project exists before doing expensive work.
-  const project = await prisma.project.findUnique({ where: { id: projectId } });
-  if (!project) {
-    throw httpError(404, `Project ${projectId} not found.`);
+  if (analysis.status === "analyzing" || analysis.status === "comparing") {
+    throw httpError(409, `Cannot provide spec while analysis is in progress (status: ${analysis.status}).`);
+  }
+  if (!analysis.reverseSpec) {
+    throw httpError(422, "Reverse spec is not ready yet. Wait for status=ready before providing the original spec.");
   }
 
-  // Step 1a: fetch diff.
-  const diff = await fetchPrDiff(prNumber, repo);
+  // Clear existing gaps so a fresh comparison starts clean.
+  await prisma.gap.deleteMany({ where: { analysisId } });
 
-  // Step 1b: run Claude reverse spec generation.
-  const { result, meta } = await generateReverseSpec(diff);
+  await prisma.analysis.update({
+    where: { id: analysisId },
+    data: { originalSpec: spec, status: "comparing", errorMessage: null },
+  });
 
-  // Step 1c: serialise to Markdown and upload to S3.
-  const generatedAt = new Date().toISOString();
-  const markdown = toMarkdown(prNumber, repo, result, generatedAt);
-  const buffer = Buffer.from(markdown, "utf-8");
-  const safeRepo = repo.replace("/", "-");
-  const s3Key = `analyses/${safeRepo}/pr-${prNumber}/${Date.now()}.md`;
-  const s3Url = await uploadBuffer(buffer, s3Key, "text/markdown");
+  setImmediate(() =>
+    runSpecComparison(analysisId).catch((err) =>
+      markFailed(analysisId, err?.message ?? "Unknown error")
+    )
+  );
+}
 
-  // Step 1d: persist File record in DB.
-  const file = await prisma.file.create({
+/**
+ * Re-run the full pipeline on the latest commit.
+ * Resets the row in-place, clears all gaps/questions.
+ */
+export async function retriggerAnalysis(
+  analysisId: string,
+  userId: string
+): Promise<void> {
+  const analysis = await prisma.analysis.findUnique({ where: { id: analysisId } });
+  if (!analysis) throw httpError(404, "Analysis not found.");
+  if (analysis.respondentId !== userId) {
+    throw httpError(403, "Only the Respondent can retrigger an analysis.");
+  }
+  if (analysis.status === "analyzing" || analysis.status === "comparing") {
+    throw httpError(409, `Analysis is already in progress (status: ${analysis.status}).`);
+  }
+
+  await prisma.gap.deleteMany({ where: { analysisId } });
+  await prisma.analysis.update({
+    where: { id: analysisId },
     data: {
-      name: `reverse-spec-pr-${prNumber}.md`,
-      s3Key,
-      s3Url,
-      projectId,
+      prHeadSha: "pending",
+      reverseSpec: null,
+      originalSpec: null,
+      status: "analyzing",
+      isStale: false,
+      errorMessage: null,
+      costUsd: null,
+      sessionId: null,
+      completedAt: null,
     },
   });
 
-  return { prNumber, repo, reverseSpec: result, meta, s3Url, s3Key, fileId: file.id };
+  setImmediate(() =>
+    runAnalysisPipeline(analysisId).catch((err) =>
+      markFailed(analysisId, err?.message ?? "Unknown error")
+    )
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Background jobs (never called from controllers directly)
+// ---------------------------------------------------------------------------
+
+async function runAnalysisPipeline(analysisId: string): Promise<void> {
+  const analysis = await prisma.analysis.findUnique({
+    where: { id: analysisId },
+    include: { project: true },
+  });
+  if (!analysis) return;
+
+  const { project, prNumber, originalSpec } = analysis;
+  const repo = project.owner && project.name ? `${project.owner}/${project.name}` : undefined;
+
+  // Step 1: fetch diff and generate reverse spec.
+  const diff = await fetchPrDiff(prNumber, repo);
+  const { result, meta } = await generateReverseSpec(diff);
+
+  await prisma.analysis.update({
+    where: { id: analysisId },
+    data: {
+      reverseSpec: result.reverse_spec,
+      costUsd: meta.costUsd,
+      sessionId: meta.sessionId,
+      status: originalSpec ? "comparing" : "ready",
+    },
+  });
+
+  if (originalSpec) {
+    await runSpecComparison(analysisId);
+  }
+}
+
+async function runSpecComparison(analysisId: string): Promise<void> {
+  const analysis = await prisma.analysis.findUnique({ where: { id: analysisId } });
+  if (!analysis?.reverseSpec || !analysis?.originalSpec) {
+    await markFailed(analysisId, "Cannot run spec comparison: reverseSpec or originalSpec is missing.");
+    return;
+  }
+
+  // Step 2: gap analysis. The original spec may be the latest of several
+  // timestamped versions — the service treats the most recent as authoritative.
+  const { result } = await generateGapAnalysis(analysis.originalSpec, analysis.reverseSpec);
+
+  const createdGaps = await Promise.all(
+    result.gaps.map((g) =>
+      prisma.gap.create({
+        data: {
+          analysisId,
+          gapKey: g.id,
+          title: g.title,
+          description: g.description,
+          type: g.type,
+          severity: g.severity,
+        },
+      })
+    )
+  );
+
+  // Step 3: question generation. Pass the gaps (keyed by their id, which we
+  // stored as gapKey) and get back one resolved gap — gap + question — per gap.
+  const { gaps: resolvedGaps } = await generateQuestions(result.gaps);
+
+  const gapKeyToId = new Map(createdGaps.map((g) => [g.gapKey, g.id]));
+
+  await Promise.all(
+    resolvedGaps.map((rg) => {
+      const gapId = gapKeyToId.get(rg.id);
+      if (!gapId) return Promise.resolve();
+      return prisma.question.create({
+        data: {
+          gapId,
+          // One question per gap; key it by the gap id it resolves.
+          questionKey: rg.id,
+          text: rg.question,
+        },
+      });
+    })
+  );
+
+  await prisma.analysis.update({
+    where: { id: analysisId },
+    data: { status: "questions_ready" },
+  });
 }
