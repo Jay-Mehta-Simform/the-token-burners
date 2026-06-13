@@ -12,7 +12,6 @@ import { generateReverseSpec } from "./reverseSpecService.js";
 import { generateGapAnalysis } from "./gapAnalysisService.js";
 import { generateQuestions } from "./questionGenerationService.js";
 import { httpError } from "../lib/httpError.js";
-import type { GapForQuestionGen } from "../prompts/questionGeneration.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -209,15 +208,16 @@ async function runSpecComparison(analysisId: string): Promise<void> {
     return;
   }
 
-  // Step 2: gap analysis.
-  const { gaps: gapRows } = await generateGapAnalysis(analysis.reverseSpec, analysis.originalSpec);
+  // Step 2: gap analysis. The original spec may be the latest of several
+  // timestamped versions — the service treats the most recent as authoritative.
+  const { result } = await generateGapAnalysis(analysis.originalSpec, analysis.reverseSpec);
 
   const createdGaps = await Promise.all(
-    gapRows.map((g) =>
+    result.gaps.map((g) =>
       prisma.gap.create({
         data: {
           analysisId,
-          gapKey: g.gapKey,
+          gapKey: g.id,
           title: g.title,
           description: g.description,
           type: g.type,
@@ -227,28 +227,22 @@ async function runSpecComparison(analysisId: string): Promise<void> {
     )
   );
 
-  // Step 3: question generation.
-  const gapsForQuestions: GapForQuestionGen[] = createdGaps.map((g) => ({
-    id: g.gapKey,
-    title: g.title,
-    description: g.description,
-    type: g.type as GapForQuestionGen["type"],
-    severity: g.severity,
-  }));
-
-  const { questions: questionRows } = await generateQuestions(gapsForQuestions);
+  // Step 3: question generation. Pass the gaps (keyed by their id, which we
+  // stored as gapKey) and get back one resolved gap — gap + question — per gap.
+  const { gaps: resolvedGaps } = await generateQuestions(result.gaps);
 
   const gapKeyToId = new Map(createdGaps.map((g) => [g.gapKey, g.id]));
 
   await Promise.all(
-    questionRows.map((q) => {
-      const gapId = gapKeyToId.get(q.gapKey);
+    resolvedGaps.map((rg) => {
+      const gapId = gapKeyToId.get(rg.id);
       if (!gapId) return Promise.resolve();
       return prisma.question.create({
         data: {
           gapId,
-          questionKey: q.questionKey,
-          text: q.text,
+          // One question per gap; key it by the gap id it resolves.
+          questionKey: rg.id,
+          text: rg.question,
         },
       });
     })
