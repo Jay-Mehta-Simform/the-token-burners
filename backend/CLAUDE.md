@@ -67,6 +67,17 @@ Defined in `.claude/commands/` — invoke with `/command-name [args]`:
 | `/typecheck` | — | Runs `tsc --noEmit` and fixes all type errors |
 | `/push` | — | Stage → commit (conventional message) → merge dev → push branch |
 
+## Validation
+
+Use **`joi`** for all request validation (body, params, query). Never use zod or manual ad-hoc checks. On failure, throw a 400 via `httpError(400, message)`.
+
+```ts
+import Joi from "joi";
+const schema = Joi.object({ projectId: Joi.string().uuid().required() });
+const { error, value } = schema.validate(req.body);
+if (error) throw httpError(400, error.message);
+```
+
 ## Key Constraints
 
 - **CommonJS modules** — `tsconfig.json` targets `"module": "commonjs"`. Do not use top-level `await` at module scope outside of async functions.

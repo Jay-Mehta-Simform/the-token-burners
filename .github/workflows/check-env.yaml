@@ -1,0 +1,54 @@
+name: Security checks
+
+on:
+  pull_request:
+    branches: [master, develop]
+
+jobs:
+  secrets-leak:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for .env files in PR
+        shell: bash
+        run: |
+          BASE="origin/${{ github.base_ref }}"
+          FILES=$(git diff --name-only "$BASE"...HEAD -- '*/.env' '.env' 2>/dev/null | grep -v '.env.example' || true)
+          if [ -n "$FILES" ]; then
+            echo "❌ .env files detected in PR:"
+            echo "$FILES"
+            echo "⚠️  Remove them before merging."
+            exit 1
+          fi
+          echo "✅ No .env files found."
+
+      - name: Check for hardcoded secrets in diff
+        shell: bash
+        run: |
+          BASE="origin/${{ github.base_ref }}"
+          ADDED=$(git diff "$BASE"...HEAD -- . | grep '^+' | grep -v '^+++' | sed 's/^+//' || true)
+
+          ERROR=0
+
+          if echo "$ADDED" | grep -qE 'AKIA[0-9A-Z]{16}'; then
+            echo "❌ AWS Access Key ID detected in diff"
+            ERROR=1
+          fi
+
+          if echo "$ADDED" | grep -qE '-----BEGIN (RSA|EC|DSA|OPENSSH) PRIVATE KEY-----'; then
+            echo "❌ Private key detected in diff"
+            ERROR=1
+          fi
+
+          if echo "$ADDED" | grep -qE '[^a-zA-Z0-9]sk-[a-zA-Z0-9]{20,}'; then
+            echo "❌ API key (sk-...) detected in diff"
+            ERROR=1
+          fi
+
+          if [ "$ERROR" -eq 1 ]; then
+            exit 1
+          fi
+          echo "✅ No hardcoded secrets detected"

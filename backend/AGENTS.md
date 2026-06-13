@@ -28,6 +28,10 @@ After any `prisma/schema.prisma` change, run `npm run prisma:generate` before st
 
 **Intent Drift AI pipeline:** uses Claude Code headless (subscription) via `src/lib/claudeRunner.ts` — not the LangChain/OpenAI singleton (currently unused). Prompts in `src/prompts/` (one file per step; step 1 `reverseSpec.ts` wired, steps 2–3 placeholders), config in `src/config/claude.ts`. Step 1: `POST /api/reverse-spec { prNumber, repo? }` → `gh pr diff` → Claude → typed JSON. Stateless. Fast test: `npm run test:reverse-spec -- <prNumber> [owner/repo]`. Requires `gh` auth + a Claude subscription login.
 
+# Validation
+
+Use **`joi`** for all request validation (body, params, query). Never use zod or manual ad-hoc checks. Throw `httpError(400, message)` on failure.
+
 # Constraints
 
 - **CommonJS** — `tsconfig.json` targets `"module": "commonjs"`. No top-level `await` outside async functions.

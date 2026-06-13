@@ -9,7 +9,7 @@ const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 const JWT_SECRET = process.env.JWT_SECRET || "default_secret";
 
 export const githubAuth = (req: Request, res: Response) => {
-    const redirectUri = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=user:email`;
+    const redirectUri = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=user:email,repo`;
     res.redirect(redirectUri);
 };
 
@@ -45,9 +45,15 @@ export const githubCallback = async (req: Request, res: Response, next: NextFunc
             headers: { Authorization: `Bearer ${accessToken}` },
         });
 
-        const { id: githubId, email, name, avatar_url: avatarUrl } = userResponse.data;
+        const {
+            id: githubId,
+            email,
+            name,
+            avatar_url: avatarUrl,
+            login: githubLogin,
+        } = userResponse.data;
 
-        // GitHub might not return email if it's private, even with scope. 
+        // GitHub might not return email if it's private, even with scope.
         // Need to fetch emails separately if missing.
         let userEmail = email;
         if (!userEmail) {
@@ -62,18 +68,22 @@ export const githubCallback = async (req: Request, res: Response, next: NextFunc
             return res.status(400).json({ error: "Email not found from GitHub" });
         }
 
-        // Upsert user in database
+        // Upsert user — persist OAuth token so downstream GitHub REST calls work
         const user = await prisma.user.upsert({
             where: { email: userEmail },
             update: {
                 githubId: String(githubId),
+                githubLogin,
                 avatarUrl,
+                oauthToken: accessToken,
                 name: name || userEmail.split("@")[0],
             },
             create: {
                 email: userEmail,
                 githubId: String(githubId),
+                githubLogin,
                 avatarUrl,
+                oauthToken: accessToken,
                 name: name || userEmail.split("@")[0],
             },
         });
@@ -96,23 +106,3 @@ export const githubCallback = async (req: Request, res: Response, next: NextFunc
     }
 };
 
-export const getUserProjects = async (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-        const userId = req.userId;
-
-        if (!userId) {
-            return res.status(401).json({ error: "Unauthorized" });
-        }
-
-        const projects = await prisma.project.findMany({
-            where: { userId },
-            include: {
-                files: true,
-            },
-        });
-
-        res.json(projects);
-    } catch (error) {
-        next(error);
-    }
-};
