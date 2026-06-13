@@ -54,6 +54,7 @@ export const githubCallback = async (
       email,
       name,
       avatar_url: avatarUrl,
+      login: githubLogin,
     } = userResponse.data;
 
     // GitHub might not return email if it's private, even with scope.
@@ -74,18 +75,22 @@ export const githubCallback = async (
       return res.status(400).json({ error: "Email not found from GitHub" });
     }
 
-    // Upsert user in database
+    // Upsert user — persist OAuth token so downstream GitHub REST calls work
     const user = await prisma.user.upsert({
       where: { email: userEmail },
       update: {
         githubId: String(githubId),
+        githubLogin,
         avatarUrl,
+        oauthToken: accessToken,
         name: name || userEmail.split("@")[0],
       },
       create: {
         email: userEmail,
         githubId: String(githubId),
+        githubLogin,
         avatarUrl,
+        oauthToken: accessToken,
         name: name || userEmail.split("@")[0],
       },
     });
