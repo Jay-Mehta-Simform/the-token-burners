@@ -21,7 +21,7 @@ export default function AnalysisWorkspace({ state, actions }) {
   const allAnswered = gaps.length > 0 && answeredCount === gaps.length
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18, maxWidth: 920 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       <button onClick={actions.back} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start', fontFamily: 'var(--font-mono)', fontSize: 12, fontWeight: 600, color: 'var(--t-muted)', background: 'none', border: 'none', cursor: 'pointer', letterSpacing: '0.04em' }}
         onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--coral)')} onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--t-muted)')}>
         <Icon name="back" size={15} /> BACK

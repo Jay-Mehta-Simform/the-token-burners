@@ -13,7 +13,7 @@ export default function Settings({ actions }) {
   ]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 680 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ background: 'var(--paper)', border: '1px solid var(--hairline)', padding: '20px 22px' }}>
         <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 700, color: 'var(--t-strong)' }}>GitHub connection</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 16 }}>
