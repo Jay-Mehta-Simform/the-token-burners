@@ -37,11 +37,13 @@ After any change to `prisma/schema.prisma`, always run `npm run prisma:generate`
 
 The Intent Drift feature uses **Claude Code headless (subscription)** as its AI engine — driven via `src/lib/claudeRunner.ts` (a port of `claude-headless-demo/`), **not** the LangChain/OpenAI singleton in `src/lib/langchain.ts` (currently unused). No Anthropic API key is needed; it reuses the local `claude` subscription login.
 
-- **Prompts** live in `src/prompts/` — one file per pipeline step. Step 1 (`reverseSpec.ts`) is wired; `gapAnalysis.ts` and `questionGeneration.ts` are placeholders for steps 2–3.
+- **Prompts** live in `src/prompts/` — one file per pipeline step. All three are wired: `reverseSpec.ts` (step 1), `gapAnalysis.ts` (step 2), `questionGeneration.ts` (step 3).
 - **Config** in `src/config/claude.ts` (model, budget cap, permission mode — env-overridable).
-- **Step 1 flow:** `POST /api/reverse-spec { prNumber, repo? }` → `githubService.fetchPrDiff` (runs `gh pr diff`) → `reverseSpecService.generateReverseSpec` (hands the diff to Claude as text, parses JSON) → typed result + run metadata. Stateless (no DB).
+- **Step 1 flow:** `POST /api/v1/analyses { prUrl, projectId }` (or the stateless `reverseSpecController`) → `githubService.fetchPrDiff` (runs `gh pr diff`) → `reverseSpecService.generateReverseSpec` (hands the diff to Claude as text, parses JSON) → typed result + run metadata.
+- **Steps 2+3 flow:** `POST /api/v1/compare-spec { reverseSpec, originalSpec | originalSpecs[] }` → `compareService.compareSpec` → `gapAnalysisService.generateGapAnalysis` (latest of any timestamped spec versions is authoritative; older ones are superseded) → `questionGenerationService.generateQuestions` (one question per gap, merged onto each gap with an empty `answer`) → frontend-ready `{ gaps: ResolvedGap[], meta }`. Stateless (no DB).
+- **Gap taxonomy:** `missing_feature | deviation | undocumented_addition` — kept in sync across `gapAnalysis.ts` (`GAP_TYPES`), `types/intentDrift.ts`, and `frontend/src/lib/meta.jsx`.
 - **Prereqs:** `gh` installed + authenticated (`gh auth login`/`GH_TOKEN`); a Claude subscription login present.
-- **Fast test (no HTTP):** `npm run test:reverse-spec -- <prNumber> [owner/repo]`.
+- **Fast tests (no HTTP):** `npm run test:reverse-spec -- <prNumber> [owner/repo]` (step 1); `npm run test:gap-questions` (steps 2+3, latest-spec prioritization + JSON Q&A).
 
 ## Environment Variables
 
