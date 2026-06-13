@@ -8,12 +8,20 @@ const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 const JWT_SECRET = process.env.JWT_SECRET || "default_secret";
 const APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:5173";
+const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL || "http://localhost:3000";
+const OAUTH_CALLBACK_URL = `${BACKEND_BASE_URL}/auth/github/callback`;
 const SESSION_COOKIE = "session";
 const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h, matches JWT expiry
 
 export const githubAuth = (req: Request, res: Response) => {
-  const redirectUri = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=user:email%20repo`;
-  res.redirect(redirectUri);
+  // Pin redirect_uri to the backend callback so GitHub sends the code here for
+  // token exchange, not to whatever default is registered on the OAuth app.
+  const params = new URLSearchParams({
+    client_id: GITHUB_CLIENT_ID || "",
+    redirect_uri: OAUTH_CALLBACK_URL,
+    scope: "user:email repo",
+  });
+  res.redirect(`https://github.com/login/oauth/authorize?${params.toString()}`);
 };
 
 export const githubCallback = async (
@@ -35,6 +43,8 @@ export const githubCallback = async (
         client_id: GITHUB_CLIENT_ID,
         client_secret: GITHUB_CLIENT_SECRET,
         code,
+        // Must match the redirect_uri sent during authorize, or GitHub rejects it.
+        redirect_uri: OAUTH_CALLBACK_URL,
       },
       {
         headers: { Accept: "application/json" },
