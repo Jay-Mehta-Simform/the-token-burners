@@ -16,6 +16,8 @@ model User {
   id        String    @id @default(uuid())
   email     String    @unique
   name      String?
+  githubId  String?   @unique
+  avatarUrl String?
   projects  Project[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
