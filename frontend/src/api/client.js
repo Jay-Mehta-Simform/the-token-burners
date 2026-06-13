@@ -119,3 +119,12 @@ export function submitAnalysis(analysisId) {
 export function exportUrl(analysisId) {
   return `/api/analyses/${analysisId}/export`
 }
+
+// POST /api/analyses/:id/retrigger -> re-run on the latest commit; resets all
+// answers and clears the stale flag. Respondent only. Returns 202.
+export function retriggerAnalysis(analysisId) {
+  return fetch(`/api/analyses/${analysisId}/retrigger`, { method: 'POST' }).then((res) => {
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+    return res
+  })
+}

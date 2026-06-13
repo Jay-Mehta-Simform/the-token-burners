@@ -3,7 +3,7 @@ import Icon, { Spinner } from '../lib/Icon.jsx'
 import Markdown from '../lib/Markdown.jsx'
 import { C, StatePill, GapChip, sevCounts, sevMeta, typeMeta } from '../lib/meta.jsx'
 import { prs } from '../data/seed.js'
-import { prKey, findRepo, downloadMarkdown } from '../lib/derive.js'
+import { prKey, findRepo } from '../lib/derive.js'
 
 export default function AnalysisWorkspace({ state, actions }) {
   const { view, analyses, specDraft } = state
@@ -54,7 +54,7 @@ export default function AnalysisWorkspace({ state, actions }) {
           onAnswer={(gapId, val) => actions.answerQuestion(key, gapId, val)}
           onSubmit={() => actions.submitAnalysis(key)}
           onViewReport={() => actions.openReport(key)}
-          onDownload={() => downloadMarkdown(analyses, key)}
+          onDownload={() => actions.exportAnalysis(key)}
         />
       )}
     </div>

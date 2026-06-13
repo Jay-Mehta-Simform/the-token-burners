@@ -41,25 +41,3 @@ export const getPresignedUploadUrl = async (
 
     return { url, key };
 };
-
-export const uploadFile = async (
-    file: Express.Multer.File,
-    key: string
-): Promise<string> => {
-    const bucketName = process.env.AWS_S3_BUCKET_NAME;
-
-    if (!bucketName) {
-        throw new Error("AWS_S3_BUCKET_NAME is not defined");
-    }
-
-    const command = new PutObjectCommand({
-        Bucket: bucketName,
-        Key: key,
-        Body: file.buffer,
-        ContentType: file.mimetype,
-    });
-
-    await s3Client.send(command);
-
-    return `https://${bucketName}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
-};

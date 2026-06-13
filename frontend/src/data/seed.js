@@ -7,41 +7,33 @@
 // endpoint contracts that should replace these fixtures.
 // ============================================================
 
+// ------------------------------------------------------------------
+// Runtime data cache. The fixtures above were demo-only; once backend
+// integration landed these caches are populated by App.jsx from the
+// real API (listProjects / listPulls). repos()/prs() are kept as the
+// accessors so every existing call site (pages + derive.js) reads live
+// data unchanged. Setters are called from the App reducer.
+// ------------------------------------------------------------------
+let _repos = []
+let _prs = []
+
 // GET /api/projects  ->  repos[]
 export function repos() {
-  return [
-    { id: 'payments-api', owner: 'acme', name: 'payments-api', lang: 'TypeScript', langColor: '#3178C6', openPRs: 4, desc: 'Core payment processing & settlement service', synced: '2h ago' },
-    { id: 'web-app', owner: 'acme', name: 'web-app', lang: 'TypeScript', langColor: '#3178C6', openPRs: 3, desc: 'Customer-facing web application', synced: '40m ago' },
-    { id: 'auth-service', owner: 'acme', name: 'auth-service', lang: 'Go', langColor: '#00ADD8', openPRs: 2, desc: 'Authentication, sessions & OAuth', synced: '5h ago' },
-    { id: 'notifications', owner: 'acme', name: 'notifications', lang: 'Node', langColor: '#539E43', openPRs: 5, desc: 'Email, SMS & push notification dispatch', synced: 'just now' },
-    { id: 'mobile-ios', owner: 'acme', name: 'mobile-ios', lang: 'Swift', langColor: '#F05138', openPRs: 2, desc: 'Native iOS client', synced: '1d ago' },
-    { id: 'billing', owner: 'acme', name: 'billing', lang: 'Java', langColor: '#B07219', openPRs: 3, desc: 'Subscription & invoicing engine', synced: '3h ago' },
-    { id: 'data-pipeline', owner: 'acme', name: 'data-pipeline', lang: 'Python', langColor: '#3572A5', openPRs: 1, desc: 'ETL & analytics ingestion', synced: '6h ago' },
-    { id: 'admin-portal', owner: 'acme', name: 'admin-portal', lang: 'TypeScript', langColor: '#3178C6', openPRs: 2, desc: 'Internal operations dashboard', synced: '30m ago' },
-  ]
+  return _repos
+}
+export function setRepos(arr) {
+  _repos = Array.isArray(arr) ? arr : []
 }
 
 // GET /api/projects/:id/pulls  ->  prs for that repo (filter by repoId)
+// prKey = `${repoId}#${number}`
 export function prs() {
-  // prKey = `${repoId}#${number}`
-  return [
-    { repoId: 'payments-api', number: 142, title: 'Refactor notification scheduler', author: 'maya-chen', branch: 'fix/notif-cadence', add: 142, del: 38, files: 7 },
-    { repoId: 'payments-api', number: 139, title: 'Add idempotency keys to charge endpoint', author: 'devon-r', branch: 'feat/idempotency', add: 96, del: 12, files: 4 },
-    { repoId: 'payments-api', number: 135, title: 'Tighten retry backoff window', author: 'sara-i', branch: 'chore/retry', add: 34, del: 21, files: 2 },
-    { repoId: 'payments-api', number: 131, title: 'Migrate to decimal currency type', author: 'maya-chen', branch: 'refactor/decimal', add: 210, del: 140, files: 12 },
-    { repoId: 'web-app', number: 312, title: 'New checkout flow', author: 'devon-r', branch: 'feat/checkout-v2', add: 520, del: 60, files: 18 },
-    { repoId: 'web-app', number: 308, title: 'Fix session timeout redirect', author: 'sara-i', branch: 'fix/session', add: 24, del: 8, files: 2 },
-    { repoId: 'web-app', number: 301, title: 'Add dark mode toggle', author: 'maya-chen', branch: 'feat/dark-mode', add: 88, del: 4, files: 6 },
-    { repoId: 'auth-service', number: 88, title: 'Rotate refresh tokens on use', author: 'devon-r', branch: 'sec/rotate-refresh', add: 140, del: 36, files: 5 },
-    { repoId: 'auth-service', number: 84, title: 'Add rate limiting to login', author: 'sara-i', branch: 'feat/rate-limit', add: 60, del: 5, files: 3 },
-    { repoId: 'notifications', number: 211, title: 'Batch digest emails hourly', author: 'maya-chen', branch: 'feat/digest', add: 118, del: 20, files: 6 },
-    { repoId: 'notifications', number: 206, title: 'Add Slack channel support', author: 'devon-r', branch: 'feat/slack', add: 90, del: 2, files: 4 },
-    { repoId: 'mobile-ios', number: 54, title: 'Offline transaction queue', author: 'sara-i', branch: 'feat/offline', add: 230, del: 18, files: 9 },
-    { repoId: 'billing', number: 73, title: 'Prorate mid-cycle plan changes', author: 'devon-r', branch: 'feat/proration', add: 160, del: 44, files: 7 },
-    { repoId: 'billing', number: 69, title: 'Add invoice CSV export', author: 'maya-chen', branch: 'feat/csv-export', add: 72, del: 6, files: 3 },
-    { repoId: 'data-pipeline', number: 40, title: 'Hotfix stock reconciliation', author: 'sara-i', branch: 'hotfix/recon', add: 88, del: 60, files: 5 },
-    { repoId: 'admin-portal', number: 19, title: 'Bulk user import endpoint', author: 'devon-r', branch: 'feat/bulk-import', add: 130, del: 8, files: 5 },
-  ]
+  return _prs
+}
+// Replace the pulls for a single repo (tagged with repoId) and keep the rest.
+export function mergePulls(repoId, pulls) {
+  const tagged = (pulls || []).map((p) => ({ ...p, repoId }))
+  _prs = _prs.filter((p) => p.repoId !== repoId).concat(tagged)
 }
 
 // GET /api/analyses/:id  ->  one analysis (status + reverseSpec + gaps[] + answers)
@@ -124,5 +116,9 @@ export function synthGaps() {
   }
 }
 
-// The signed-in GitHub user (GET /auth/github/callback establishes this session).
-export const CURRENT_USER = 'maya-chen'
+// The signed-in GitHub user. Populated from GET /api/me after the OAuth session
+// cookie is set. Exported as a live binding so the sidebar/settings reflect it.
+export let CURRENT_USER = ''
+export function setCurrentUser(login) {
+  CURRENT_USER = login || ''
+}

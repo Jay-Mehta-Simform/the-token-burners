@@ -7,6 +7,9 @@ import { AuthRequest } from "../middleware/auth.js";
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 const JWT_SECRET = process.env.JWT_SECRET || "default_secret";
+const APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:5173";
+const SESSION_COOKIE = "session";
+const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h, matches JWT expiry
 
 export const githubAuth = (req: Request, res: Response) => {
   const redirectUri = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=user:email%20repo`;
@@ -126,24 +129,68 @@ export const githubCallback = async (
       }
     }
 
-    // Generate JWT
+    // Generate JWT and deliver it as an httpOnly session cookie, then redirect
+    // back to the SPA. The token never reaches client-side JS (matches the
+    // frontend contract in frontend/src/api/client.js).
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, {
       expiresIn: "24h",
     });
 
+    res.cookie(SESSION_COOKIE, token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: SESSION_MAX_AGE_MS,
+    });
+
+    res.redirect(APP_BASE_URL);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/me
+ * Returns the current authenticated user's public identity.
+ */
+export const getMe = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     res.json({
-      message: "Authentication successful",
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        avatarUrl: user.avatarUrl,
-      },
+      id: user.id,
+      github_login: user.githubLogin,
+      name: user.name,
+      avatar_url: user.avatarUrl,
     });
   } catch (error) {
     next(error);
   }
+};
+
+/**
+ * POST /auth/logout
+ * Clears the session cookie.
+ */
+export const logout = (_req: Request, res: Response) => {
+  res.clearCookie(SESSION_COOKIE, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+  res.status(204).end();
 };
 
 export const getUserProjects = async (

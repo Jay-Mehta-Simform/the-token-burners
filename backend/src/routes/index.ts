@@ -1,9 +1,10 @@
 import { Router } from "express";
 import fileRoutes from "./fileRoutes.js";
-import userRoutes from "./userRoutes.js";
 import projectRoutes from "./projectRoutes.js";
 import analysisRoutes from "./analysisRoutes.js";
 import { compareController } from "../controllers/compareController.js";
+import { getMe } from "../controllers/userController.js";
+import { authenticate } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -11,8 +12,10 @@ router.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+// Current authenticated user (sidebar identity + Settings).
+router.get("/me", authenticate, getMe);
+
 router.use("/files", fileRoutes);
-router.use("/", userRoutes);
 router.use("/projects", projectRoutes);
 router.use("/analyses", analysisRoutes);
 

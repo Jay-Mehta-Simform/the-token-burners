@@ -3,7 +3,7 @@ import Icon from '../lib/Icon.jsx'
 import Markdown from '../lib/Markdown.jsx'
 import { GapChip, sevCounts, sevMeta, typeMeta } from '../lib/meta.jsx'
 import { prs } from '../data/seed.js'
-import { findRepo, downloadMarkdown } from '../lib/derive.js'
+import { findRepo } from '../lib/derive.js'
 
 // Drift Report (Decision Record) detail — read-only view of a completed analysis.
 export default function ReportDetail({ state, actions }) {
@@ -28,8 +28,8 @@ export default function ReportDetail({ state, actions }) {
             <h2 style={{ margin: '8px 0 0', fontFamily: 'var(--font-sans)', fontSize: 22, fontWeight: 700, color: 'var(--t-strong)', letterSpacing: '-0.015em' }}>{pr.title || key}</h2>
             <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--t-muted)', marginTop: 7 }}>{r.owner}/{r.name} · PR #{num} · Respondent {a.respondent} · {a.when}</div>
           </div>
-          {/* BACKEND: window.location = exportUrl(analysisId) */}
-          <button onClick={() => downloadMarkdown(analyses, key)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 15px', background: 'var(--coral)', border: 'none', borderRadius: 6, fontSize: 13.5, fontWeight: 700, color: '#fff', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
+          {/* Streams the Decision Record markdown from GET /api/analyses/:id/export */}
+          <button onClick={() => actions.exportAnalysis(key)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '10px 15px', background: 'var(--coral)', border: 'none', borderRadius: 6, fontSize: 13.5, fontWeight: 700, color: '#fff', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--coral-deep)')} onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--coral)')}>
             <Icon name="download" size={15} /> Download Markdown
           </button>
