@@ -1,0 +1,12 @@
+{
+  "name": "Session End — Update session_flow.md",
+  "version": "1.0.0",
+  "description": "When the agent stops, remind it to document progress in backend/session_flow.md.",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Before finishing: update backend/session_flow.md with what was accomplished this session, current state, and pending tasks. Create the file if it doesn't exist."
+  }
+}
