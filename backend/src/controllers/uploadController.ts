@@ -59,24 +59,3 @@ export const saveFileRecord = async (
     next(error);
   }
 };
-
-export const testUpload = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No file uploaded" });
-    }
-
-    const key = `test-uploads/${Date.now()}-${req.file.originalname}`;
-    // Note: keeping the original direct upload for testing if needed
-    // but it doesn't save to DB yet.
-    res.json({
-      message: "Test direct upload not fully implemented for new schema",
-    });
-  } catch (error) {
-    next(error);
-  }
-};

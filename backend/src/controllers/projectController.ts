@@ -52,7 +52,9 @@ export const syncProjectsController = async (req: AuthRequest, res: Response, ne
 
     const projects = await syncProjects(userId, user.oauthToken);
 
-    res.json({ synced: projects.length, projects });
+    // Contract (client.js#resyncProjects) expects the refreshed array directly.
+    res.setHeader("X-Synced-Count", String(projects.length));
+    res.json(projects);
   } catch (err) {
     next(err);
   }

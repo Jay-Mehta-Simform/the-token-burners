@@ -7,10 +7,21 @@ import { AuthRequest } from "../middleware/auth.js";
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID;
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET;
 const JWT_SECRET = process.env.JWT_SECRET || "default_secret";
+const APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:5173";
+const BACKEND_BASE_URL = process.env.BACKEND_BASE_URL || "http://localhost:3000";
+const OAUTH_CALLBACK_URL = `${BACKEND_BASE_URL}/auth/github/callback`;
+const SESSION_COOKIE = "session";
+const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h, matches JWT expiry
 
 export const githubAuth = (req: Request, res: Response) => {
-  const redirectUri = `https://github.com/login/oauth/authorize?client_id=${GITHUB_CLIENT_ID}&scope=user:email%20repo`;
-  res.redirect(redirectUri);
+  // Pin redirect_uri to the backend callback so GitHub sends the code here for
+  // token exchange, not to whatever default is registered on the OAuth app.
+  const params = new URLSearchParams({
+    client_id: GITHUB_CLIENT_ID || "",
+    redirect_uri: OAUTH_CALLBACK_URL,
+    scope: "user:email repo",
+  });
+  res.redirect(`https://github.com/login/oauth/authorize?${params.toString()}`);
 };
 
 export const githubCallback = async (
@@ -32,6 +43,8 @@ export const githubCallback = async (
         client_id: GITHUB_CLIENT_ID,
         client_secret: GITHUB_CLIENT_SECRET,
         code,
+        // Must match the redirect_uri sent during authorize, or GitHub rejects it.
+        redirect_uri: OAUTH_CALLBACK_URL,
       },
       {
         headers: { Accept: "application/json" },
@@ -126,24 +139,68 @@ export const githubCallback = async (
       }
     }
 
-    // Generate JWT
+    // Generate JWT and deliver it as an httpOnly session cookie, then redirect
+    // back to the SPA. The token never reaches client-side JS (matches the
+    // frontend contract in frontend/src/api/client.js).
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, {
       expiresIn: "24h",
     });
 
+    res.cookie(SESSION_COOKIE, token, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: SESSION_MAX_AGE_MS,
+    });
+
+    res.redirect(APP_BASE_URL);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * GET /api/me
+ * Returns the current authenticated user's public identity.
+ */
+export const getMe = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const userId = req.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
     res.json({
-      message: "Authentication successful",
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        avatarUrl: user.avatarUrl,
-      },
+      id: user.id,
+      github_login: user.githubLogin,
+      name: user.name,
+      avatar_url: user.avatarUrl,
     });
   } catch (error) {
     next(error);
   }
+};
+
+/**
+ * POST /auth/logout
+ * Clears the session cookie.
+ */
+export const logout = (_req: Request, res: Response) => {
+  res.clearCookie(SESSION_COOKIE, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+  res.status(204).end();
 };
 
 export const getUserProjects = async (

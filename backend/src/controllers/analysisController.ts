@@ -23,7 +23,7 @@ const triggerSchema = Joi.object({
 });
 
 const specSchema = Joi.object({
-  spec: Joi.string().min(1).required(),
+  original_spec: Joi.string().min(1).required(),
 });
 
 const answerSchema = Joi.object({
@@ -158,21 +158,26 @@ export async function getAnalysis(req: AuthRequest, res: Response, next: NextFun
       status: analysis.status,
       is_stale: isStale,
       error_message: analysis.errorMessage,
-      respondent: analysis.respondent,
+      // Frontend renders the respondent as a GitHub username string.
+      respondent: analysis.respondent.githubLogin ?? analysis.respondent.name,
       reverse_spec: analysis.reverseSpec,
       original_spec: analysis.originalSpec,
-      gaps: analysis.gaps.map((g) => ({
-        id: g.id,
-        title: g.title,
-        type: g.type,
-        severity: g.severity,
-        description: g.description,
-        questions: g.questions.map((q) => ({
-          id: q.id,
-          text: q.text,
-          answer: q.answer,
-        })),
-      })),
+      // One question per gap (SPEC §5) — flatten so the UI can render + answer
+      // inline. question_id lets the frontend target PATCH /:id/answers.
+      gaps: analysis.gaps.map((g) => {
+        const q = g.questions[0];
+        return {
+          id: g.id,
+          title: g.title,
+          type: g.type,
+          severity: g.severity,
+          description: g.description,
+          question: q?.text ?? "",
+          answer: q?.answer ?? "",
+          question_id: q?.id ?? null,
+        };
+      }),
+      when: analysis.completedAt ?? analysis.createdAt,
       created_at: analysis.createdAt,
       completed_at: analysis.completedAt,
     });
@@ -193,7 +198,7 @@ export async function provideSpecController(req: AuthRequest, res: Response, nex
     const bodyResult = specSchema.validate(req.body);
     if (bodyResult.error) throw httpError(400, bodyResult.error.message);
 
-    await provideSpec(paramResult.value.id, req.userId!, bodyResult.value.spec);
+    await provideSpec(paramResult.value.id, req.userId!, bodyResult.value.original_spec);
 
     res.status(202).json({ message: "Spec accepted. Gap analysis running in background." });
   } catch (err) {

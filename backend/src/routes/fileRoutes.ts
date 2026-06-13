@@ -1,34 +1,10 @@
 import { Router } from "express";
-import multer from "multer";
 import {
-    testUpload,
     getPresignedUrl,
     saveFileRecord,
 } from "../controllers/uploadController.js";
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage() });
-
-/**
- * @swagger
- * /files/upload-test:
- *   post:
- *     summary: Test direct file upload
- *     tags: [Files]
- *     requestBody:
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               file:
- *                 type: string
- *                 format: binary
- *     responses:
- *       200:
- *         description: Success message
- */
-router.post("/upload-test", upload.single("file"), testUpload);
 
 /**
  * @swagger

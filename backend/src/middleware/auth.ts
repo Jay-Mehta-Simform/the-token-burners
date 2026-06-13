@@ -8,13 +8,21 @@ export interface AuthRequest extends Request {
 }
 
 export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
+    // Prefer the httpOnly session cookie (SPA flow); fall back to a Bearer
+    // header (API clients / tests).
+    const cookieToken = (req as Request & { cookies?: Record<string, string> })
+        .cookies?.session;
     const authHeader = req.headers.authorization;
+    const headerToken =
+        authHeader && authHeader.startsWith("Bearer ")
+            ? authHeader.split(" ")[1]
+            : undefined;
 
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({ error: "Authorization header required" });
+    const token = cookieToken || headerToken;
+
+    if (!token) {
+        return res.status(401).json({ error: "Authentication required" });
     }
-
-    const token = authHeader.split(" ")[1];
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };

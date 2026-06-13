@@ -2,9 +2,10 @@ import { Router } from "express";
 import {
     githubAuth,
     githubCallback,
+    logout,
 } from "../controllers/userController.js";
-import { authenticate } from "../middleware/auth.js";
 
+// Mounted at /auth in index.ts.
 const router = Router();
 
 /**
@@ -17,13 +18,13 @@ const router = Router();
  *       302:
  *         description: Redirect to GitHub OAuth page
  */
-router.get("/auth/github", githubAuth);
+router.get("/github", githubAuth);
 
 /**
  * @swagger
  * /auth/github/callback:
  *   get:
- *     summary: GitHub OAuth callback
+ *     summary: GitHub OAuth callback — sets a session cookie and redirects to the SPA
  *     tags: [Auth]
  *     parameters:
  *       - in: query
@@ -32,9 +33,21 @@ router.get("/auth/github", githubAuth);
  *         schema:
  *           type: string
  *     responses:
- *       200:
- *         description: Authentication successful, returns JWT and user info
+ *       302:
+ *         description: Session cookie set; redirect back to the frontend
  */
-router.get("/auth/github/callback", githubCallback);
+router.get("/github/callback", githubCallback);
+
+/**
+ * @swagger
+ * /auth/logout:
+ *   post:
+ *     summary: Clear the session cookie
+ *     tags: [Auth]
+ *     responses:
+ *       204:
+ *         description: Logged out
+ */
+router.post("/logout", logout);
 
 export default router;

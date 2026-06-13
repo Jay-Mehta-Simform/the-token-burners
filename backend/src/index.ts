@@ -1,9 +1,11 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import router from "./routes/index.js";
+import authRouter from "./routes/userRoutes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
@@ -20,7 +22,7 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: `http://localhost:${PORT}/api/v1`,
+        url: `http://localhost:${PORT}/api`,
         description: "Development server",
       },
     ],
@@ -30,15 +32,26 @@ const swaggerOptions = {
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 
-app.use(cors());
+const APP_BASE_URL = process.env.APP_BASE_URL ?? "http://localhost:5173";
+
+app.use(
+  cors({
+    origin: APP_BASE_URL,
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // Swagger UI
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+// Auth routes (top-level: /auth/github, /auth/github/callback, /auth/logout)
+app.use("/auth", authRouter);
+
 // API Routes
-app.use("/api/v1", router);
+app.use("/api", router);
 
 app.use(errorHandler);
 

@@ -4,3 +4,4 @@ backend/generated/
 backend/dist
 frontend/dist
 frontend/node_modules
+frontend/.vite

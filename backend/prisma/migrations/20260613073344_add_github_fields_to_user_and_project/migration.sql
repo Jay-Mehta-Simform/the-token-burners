@@ -4,14 +4,10 @@ ADD COLUMN "githubRepoId" TEXT,
 ADD COLUMN "lang" TEXT,
 ADD COLUMN "owner" TEXT;
 
--- AlterTable: add OAuth token + github fields to User (avatarUrl/githubId were in schema but never migrated)
-ALTER TABLE "User" ADD COLUMN "avatarUrl" TEXT,
-ADD COLUMN "githubId" TEXT,
-ADD COLUMN "githubLogin" TEXT,
+-- AlterTable: add remaining github fields to User
+-- (avatarUrl, githubId + its unique index were already added in 20260613073343_oauth_github)
+ALTER TABLE "User" ADD COLUMN "githubLogin" TEXT,
 ADD COLUMN "oauthToken" TEXT;
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Project_githubRepoId_key" ON "Project"("githubRepoId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "User_githubId_key" ON "User"("githubId");
