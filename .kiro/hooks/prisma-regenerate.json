@@ -1,0 +1,13 @@
+{
+  "name": "Remind Prisma Regenerate on Schema Change",
+  "version": "1.0.0",
+  "description": "When prisma/schema.prisma is edited, remind the agent to regenerate the Prisma client.",
+  "when": {
+    "type": "fileEdited",
+    "patterns": ["backend/prisma/schema.prisma"]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "prisma/schema.prisma was just edited. Run `npm run prisma:generate` in the backend directory to regenerate the Prisma client at generated/prisma/. Do this before running the app or writing any code that imports from the Prisma client."
+  }
+}

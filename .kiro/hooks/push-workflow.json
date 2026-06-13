@@ -1,0 +1,12 @@
+{
+  "name": "Push Workflow",
+  "version": "1.0.0",
+  "description": "Manually triggered. Runs the full git push workflow: stage → commit (conventional) → merge develop → push branch.",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Run the full push workflow from .kiro/steering/cmd-push.md: stage all changes, write a conventional commit message, merge from develop, then push the current branch. Stop and report if any step fails."
+  }
+}
